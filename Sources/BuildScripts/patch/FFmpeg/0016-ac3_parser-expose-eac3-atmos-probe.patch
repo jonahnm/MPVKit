@@ -1,21 +1,16 @@
 diff --git a/libavcodec/ac3_parser.c b/libavcodec/ac3_parser.c
-index a8bc3af..89d6ddb 100644
+index 232c96d517..736df14e86 100644
 --- a/libavcodec/ac3_parser.c
 +++ b/libavcodec/ac3_parser.c
-@@ -33,6 +33,7 @@
--#include "get_bits.h"
--
--
--#define AC3_HEADER_SIZE 7
--
-+#include "get_bits.h"
+@@ -31,6 +31,7 @@
+ #include "ac3_parser_internal.h"
+ #include "aac_ac3_parser.h"
+ #include "get_bits.h"
 +#include "put_bits.h"
-+
-+
-+#define AC3_HEADER_SIZE 7
-+
- #if CONFIG_AC3_PARSER
-@@ -440,6 +441,128 @@ int av_ac3_parse_header(const uint8_t *buf, size_t size,
+ #include "parser_internal.h"
+ 
+ 
+@@ -441,6 +442,128 @@ int av_ac3_parse_header(const uint8_t *buf, size_t size,
      return 0;
  }
  
@@ -144,7 +139,7 @@ index a8bc3af..89d6ddb 100644
  static int ac3_sync(uint64_t state, int *need_next_header, int *new_frame_start)
  {
      int err;
-@@ -498,4 +621,13 @@ int av_ac3_parse_header(const uint8_t *buf, size_t size,
+@@ -499,4 +622,13 @@ int av_ac3_parse_header(const uint8_t *buf, size_t size,
  {
      return AVERROR(ENOSYS);
  }
@@ -159,7 +154,7 @@ index a8bc3af..89d6ddb 100644
 +}
  #endif
 diff --git a/libavcodec/ac3_parser.h b/libavcodec/ac3_parser.h
-index ff8cc4c..e60af69 100644
+index ff8cc4cf09..3502b53c7b 100644
 --- a/libavcodec/ac3_parser.h
 +++ b/libavcodec/ac3_parser.h
 @@ -32,5 +32,18 @@
