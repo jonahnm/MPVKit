@@ -518,10 +518,15 @@ private class BuildLcevcDec: BaseBuild {
             .sorted() ?? []
         for name in components {
             let capitalized = "Lib" + name.dropFirst(3)
-            let source = (libDir + name).path
+            let thinSource = (libDir + name).path
+            // The install read the archives from the scratch lib dir, so use
+            // that as the copy source; the thin-dir copies seem unreadable to
+            // child processes right after the install.
+            let scratchSource = (buildURL + ["lib", name]).path
             let destination = (libDir + capitalized).path
             try? FileManager.default.removeItem(atPath: destination)
-            try Utility.launch(path: "/bin/cp", arguments: ["-RL", source, destination])
+            try Utility.launch(path: "/bin/cp", arguments: ["-R", scratchSource, destination])
+            print("copied \(name) -> \(capitalized)")
         }
     }
 
