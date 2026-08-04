@@ -1,0 +1,180 @@
+diff --git a/libavformat/isom.h b/libavformat/isom.h
+index e02af09..422c2a0 100644
+--- a/libavformat/isom.h
++++ b/libavformat/isom.h
+@@ -34,6 +34,7 @@
+ #include "libavutil/stereo3d.h"
+ 
+ #include "avio.h"
++#include "libavcodec/packet.h"
+ #include "internal.h"
+ #include "dv.h"
+ 
+@@ -288,6 +289,16 @@ typedef struct MOVStreamContext {
+ 
+     struct IAMFDemuxContext *iamf;
+     int iamf_stream_offset;
++
++    /* Separate-track LCEVC (MPEG-5 part 2) enhancement merging. When this
++     * stream is a base layer with a dedicated lvc1 enhancement track,
++     * lcevc_el_index holds the enhancement stream's ffindex (-1 if none);
++     * on the enhancement stream itself, lcevc_base_index holds the ffindex
++     * of the base stream it enhances and lcevc_pending buffers the latest
++     * enhancement packet until its base frame is read. */
++    int lcevc_el_index;
++    int lcevc_base_index;
++    AVPacket *lcevc_pending;
+ } MOVStreamContext;
+ 
+ typedef struct HEIFItemRef {
+diff --git a/libavformat/mov.c b/libavformat/mov.c
+index 5a66d57..b1a81fa 100644
+--- a/libavformat/mov.c
++++ b/libavformat/mov.c
+@@ -69,6 +69,7 @@
+ #include "riff.h"
+ #include "isom.h"
+ #include "libavcodec/get_bits.h"
++#include "libavcodec/bytestream.h"
+ #include "id3v1.h"
+ #include "mov_chan.h"
+ #include "replaygain.h"
+@@ -11442,6 +11443,20 @@ static int mov_parse_lcevc_streams(AVFormatContext *s)
+             return err;
+ 
+         stg->params.layered_video->el_index = stg->nb_streams - 1;
++
++        /* Record the base/enhancement pair on the stream contexts so
++         * mov_read_packet can merge the enhancement packets into the base
++         * stream (separate-track LCEVC carriage). The enhancement stream is
++         * always the last member of the group. */
++        for (int k = 0; k < stg->nb_streams; k++) {
++            AVStream *member = stg->streams[k];
++            MOVStreamContext *msc = member->priv_data;
++            if (member->codecpar->codec_id == AV_CODEC_ID_LCEVC) {
++                msc->lcevc_base_index = stg->streams[0]->index;
++            } else {
++                msc->lcevc_el_index = st->index;
++            }
++        }
+     }
+ 
+     return 0;
+@@ -12043,6 +12058,70 @@ static int mov_finalize_packet(AVFormatContext *s, AVStream *st, AVIndexEntry *s
+     return 0;
+ }
+ 
++/* Attach the LCEVC enhancement packet to a base-layer packet as
++ * AV_PKT_DATA_LCEVC side data, converting length-prefixed LCEVC NALs to
++ * start-code units like the lcevc_merge bitstream filter. */
++static void mov_lcevc_merge_packet(AVFormatContext *s, AVPacket *base_pkt,
++                                   const AVPacket *el_pkt)
++{
++    int nal_length_size = 0;
++    const uint8_t *p;
++    int remaining;
++    uint8_t *buf;
++    size_t size = 0;
++
++    if (el_pkt->size <= 0)
++        return;
++
++    /* The lvc1 sample entry carries an avcC-like config with the NAL length
++     * size at the same offset the lcevc_merge filter reads; fall back to
++     * auto-detection when the demuxer did not surface extradata. */
++    if (s->streams[el_pkt->stream_index]->codecpar->extradata_size > 4 &&
++        s->streams[el_pkt->stream_index]->codecpar->extradata[0])
++        nal_length_size = (s->streams[el_pkt->stream_index]->codecpar->extradata[4] >> 6) + 1;
++    else if (el_pkt->size > 4 && AV_RB32(el_pkt->data) == el_pkt->size - 4)
++        nal_length_size = 4;
++    else if (el_pkt->size > 2 && AV_RB16(el_pkt->data) == el_pkt->size - 2)
++        nal_length_size = 2;
++
++    p = el_pkt->data;
++    remaining = el_pkt->size;
++    if (nal_length_size) {
++        while (remaining >= nal_length_size) {
++            int nal_size = nal_length_size == 4 ? AV_RB32(p) : AV_RB16(p);
++            p += nal_length_size;
++            remaining -= nal_length_size;
++            if (nal_size < 0 || nal_size > remaining || nal_size > INT_MAX - 4)
++                return;
++            size += nal_size + 4;
++            p += nal_size;
++            remaining -= nal_size;
++        }
++        if (remaining)
++            return;
++
++        buf = av_packet_new_side_data(base_pkt, AV_PKT_DATA_LCEVC, size);
++        if (!buf)
++            return;
++        p = el_pkt->data;
++        remaining = el_pkt->size;
++        while (remaining >= nal_length_size) {
++            int nal_size = nal_length_size == 4 ? AV_RB32(p) : AV_RB16(p);
++            p += nal_length_size;
++            remaining -= nal_length_size;
++            AV_WB32(buf, 1);
++            memcpy(buf + 4, p, nal_size);
++            buf += 4 + nal_size;
++            p += nal_size;
++            remaining -= nal_size;
++        }
++    } else {
++        buf = av_packet_new_side_data(base_pkt, AV_PKT_DATA_LCEVC, el_pkt->size);
++        if (buf)
++            memcpy(buf, el_pkt->data, el_pkt->size);
++    }
++}
++
+ static int mov_read_packet(AVFormatContext *s, AVPacket *pkt)
+ {
+     MOVContext *mov = s->priv_data;
+@@ -12210,6 +12289,30 @@ static int mov_read_packet(AVFormatContext *s, AVPacket *pkt)
+     if (ret < 0)
+         return ret;
+ 
++    /* Separate-track LCEVC: buffer enhancement packets and merge them into
++     * the base stream as AV_PKT_DATA_LCEVC side data (mirrors what the
++     * lcevc_merge bitstream filter does for stream-grouped inputs). */
++    if (st->codecpar->codec_id == AV_CODEC_ID_LCEVC && sc->lcevc_base_index >= 0) {
++        if (!sc->lcevc_pending ||
++            (pkt->dts != AV_NOPTS_VALUE &&
++             (sc->lcevc_pending->dts == AV_NOPTS_VALUE || sc->lcevc_pending->dts < pkt->dts))) {
++            av_packet_free(&sc->lcevc_pending);
++            sc->lcevc_pending = av_packet_clone(pkt);
++        }
++        av_packet_unref(pkt);
++        goto retry;
++    }
++
++    if (sc->lcevc_el_index >= 0 && pkt->dts != AV_NOPTS_VALUE) {
++        MOVStreamContext *el_sc = s->streams[sc->lcevc_el_index]->priv_data;
++        if (el_sc->lcevc_pending &&
++            (el_sc->lcevc_pending->dts == AV_NOPTS_VALUE ||
++             el_sc->lcevc_pending->dts <= pkt->dts)) {
++            mov_lcevc_merge_packet(s, pkt, el_sc->lcevc_pending);
++            av_packet_free(&el_sc->lcevc_pending);
++        }
++    }
++
+     if (st->discard == AVDISCARD_ALL)
+         goto retry;
+ 
+@@ -12329,6 +12432,7 @@ static int mov_seek_stream(AVFormatContext *s, AVStream *st, int64_t timestamp,
+     }
+ 
+     mov_current_sample_set(sc, sample);
++    av_packet_free(&sc->lcevc_pending);
+     av_log(s, AV_LOG_TRACE, "stream %d, found sample %d\n", st->index, sc->current_sample);
+     /* adjust time to sample index */
+     if (sc->tts_data) {
+@@ -12419,6 +12523,7 @@ static int mov_read_seek(AVFormatContext *s, int stream_index, int64_t sample_ti
+             st = s->streams[i];
+             sc = st->priv_data;
+             mov_current_sample_set(sc, 0);
++            av_packet_free(&sc->lcevc_pending);
+         }
+         while (1) {
+             MOVStreamContext *sc;
