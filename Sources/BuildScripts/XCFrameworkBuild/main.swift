@@ -495,9 +495,9 @@ private class BuildLcevcDec: BaseBuild {
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
         ]
         configureArgs += arguments(platform: platform, arch: arch)
-        try Utility.launch(path: cmake, arguments: configureArgs, currentDirectoryURL: buildURL, environment: environ, isOutput: true)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ, isOutput: true)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ, isOutput: true)
+        try Utility.launch(path: cmake, arguments: configureArgs, isOutput: true, currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], isOutput: true, currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], isOutput: true, currentDirectoryURL: buildURL, environment: environ)
         let libDir = thinDir(platform: platform, arch: arch) + "lib"
         if let names = try? FileManager.default.contentsOfDirectory(atPath: libDir.path) {
             print("liblcevc_dec thin lib dir contents: \(names)")
