@@ -510,7 +510,9 @@ private class BuildLcevcDec: BaseBuild {
         // liblcevc_dec_common.a, ...). The framework step lips one archive per
         // framework, so mirror the fork's Lib<Name>.a convention for each
         // component while keeping the originals for the lcevc_dec pkg-config
-        // that FFmpeg's configure consumes.
+        // that FFmpeg's configure consumes. -L dereferences any symlinks the
+        // install left behind.
+        try Utility.launch(path: "/bin/ls", arguments: ["-la", libDir.path], isOutput: true)
         let components = (try? FileManager.default.contentsOfDirectory(atPath: libDir.path))?
             .filter { $0.hasPrefix("liblcevc_dec_") && $0.hasSuffix(".a") }
             .sorted() ?? []
@@ -519,7 +521,7 @@ private class BuildLcevcDec: BaseBuild {
             let source = (libDir + name).path
             let destination = (libDir + capitalized).path
             try? FileManager.default.removeItem(atPath: destination)
-            try Utility.launch(path: "/bin/cp", arguments: ["-R", source, destination])
+            try Utility.launch(path: "/bin/cp", arguments: ["-RL", source, destination])
         }
     }
 
