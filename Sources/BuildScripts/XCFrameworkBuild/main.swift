@@ -474,8 +474,7 @@ private class BuildLcevcDec: BaseBuild {
 
     override func build(platform: PlatformType, arch: ArchType) throws {
         // Run the CMake configure/build/install steps directly (mirrors
-        // BaseBuild's cmake branch) so the make output lands in the CI log
-        // when something fails.
+        // BaseBuild's cmake branch) so failures surface in the CI log.
         let buildURL = scratch(platform: platform, arch: arch)
         try? FileManager.default.createDirectory(at: buildURL, withIntermediateDirectories: true, attributes: nil)
         let environ = environment(platform: platform, arch: arch)
@@ -495,38 +494,26 @@ private class BuildLcevcDec: BaseBuild {
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
         ]
         configureArgs += arguments(platform: platform, arch: arch)
-        try Utility.launch(path: cmake, arguments: configureArgs, isOutput: true, currentDirectoryURL: buildURL, environment: environ)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], isOutput: true, currentDirectoryURL: buildURL, environment: environ)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], isOutput: true, currentDirectoryURL: buildURL, environment: environ)
-        let libDir = thinDir(platform: platform, arch: arch) + "lib"
-        if let names = try? FileManager.default.contentsOfDirectory(atPath: libDir.path) {
-            print("liblcevc_dec thin lib dir contents: \(names)")
-        } else {
-            print("liblcevc_dec thin lib dir missing: \(libDir.path)")
-        }
-        print("liblcevc_dec scratch contents: \((try? FileManager.default.contentsOfDirectory(atPath: buildURL.path)) ?? [])")
+        try Utility.launch(path: cmake, arguments: configureArgs, currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ)
 
         // LCEVCdec installs one archive per component (liblcevc_dec_api.a,
         // liblcevc_dec_common.a, ...). The framework step lips one archive per
         // framework, so mirror the fork's Lib<Name>.a convention for each
         // component while keeping the originals for the lcevc_dec pkg-config
-        // that FFmpeg's configure consumes. -L dereferences any symlinks the
-        // install left behind.
-        try Utility.launch(path: "/bin/ls", arguments: ["-la", libDir.path], isOutput: true)
+        // that FFmpeg's configure consumes. The archives are copied from the
+        // scratch lib dir the install read them from.
+        let libDir = thinDir(platform: platform, arch: arch) + "lib"
         let components = (try? FileManager.default.contentsOfDirectory(atPath: libDir.path))?
             .filter { $0.hasPrefix("liblcevc_dec_") && $0.hasSuffix(".a") }
             .sorted() ?? []
         for name in components {
             let capitalized = "Lib" + name.dropFirst(3)
-            let thinSource = (libDir + name).path
-            // The install read the archives from the scratch lib dir, so use
-            // that as the copy source; the thin-dir copies seem unreadable to
-            // child processes right after the install.
             let scratchSource = (buildURL + ["lib", name]).path
             let destination = (libDir + capitalized).path
             try? FileManager.default.removeItem(atPath: destination)
             try Utility.launch(path: "/bin/cp", arguments: ["-R", scratchSource, destination])
-            print("copied \(name) -> \(capitalized)")
         }
     }
 
@@ -708,6 +695,10 @@ private class BuildFFMPEG: BaseBuild {
             .liblcevc_dec,
         ]
         for library in dependencyLibrary {
+            // FFmpeg master dropped the --enable-libshaderc configure option.
+            if library == .libshaderc {
+                continue
+            }
             let path =
                 URL.currentDirectory + [library.rawValue, platform.rawValue, "thin", arch.rawValue]
             if FileManager.default.fileExists(atPath: path.path) {
