@@ -496,14 +496,15 @@ private class BuildLcevcDec: BaseBuild {
         ]
         configureArgs += arguments(platform: platform, arch: arch)
         try Utility.launch(path: cmake, arguments: configureArgs, currentDirectoryURL: buildURL, environment: environ, isOutput: true)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ, isOutput: true)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ, isOutput: true)
         let libDir = thinDir(platform: platform, arch: arch) + "lib"
         if let names = try? FileManager.default.contentsOfDirectory(atPath: libDir.path) {
             print("liblcevc_dec thin lib dir contents: \(names)")
         } else {
             print("liblcevc_dec thin lib dir missing: \(libDir.path)")
         }
+        print("liblcevc_dec scratch contents: \((try? FileManager.default.contentsOfDirectory(atPath: buildURL.path)) ?? [])")
 
         // LCEVCdec installs one archive per component (liblcevc_dec_api.a,
         // liblcevc_dec_common.a, ...). The framework step lips one archive per
