@@ -473,7 +473,31 @@ private class BuildLcevcDec: BaseBuild {
     }
 
     override func build(platform: PlatformType, arch: ArchType) throws {
-        try super.build(platform: platform, arch: arch)
+        // Run the CMake configure/build/install steps directly (mirrors
+        // BaseBuild's cmake branch) so the make output lands in the CI log
+        // when something fails.
+        let buildURL = scratch(platform: platform, arch: arch)
+        try? FileManager.default.createDirectory(at: buildURL, withIntermediateDirectories: true, attributes: nil)
+        let environ = environment(platform: platform, arch: arch)
+        let thinDirPath = thinDir(platform: platform, arch: arch).path
+
+        let cmake = Utility.shell("which cmake", isOutput: true)!
+        var configureArgs = [
+            directoryURL.path,
+            "-DCMAKE_VERBOSE_MAKEFILE=0",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_OSX_SYSROOT=\(platform.sdk.lowercased())",
+            "-DCMAKE_OSX_ARCHITECTURES=\(arch.rawValue)",
+            "-DCMAKE_SYSTEM_NAME=\(platform.cmakeSystemName)",
+            "-DCMAKE_SYSTEM_PROCESSOR=\(arch.rawValue)",
+            "-DCMAKE_INSTALL_PREFIX=\(thinDirPath)",
+            "-DBUILD_SHARED_LIBS=0",
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+        ]
+        configureArgs += arguments(platform: platform, arch: arch)
+        try Utility.launch(path: cmake, arguments: configureArgs, currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ)
 
         // LCEVCdec installs one archive per component (liblcevc_dec_api.a,
         // liblcevc_dec_common.a, ...). The framework step lips one archive per
