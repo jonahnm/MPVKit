@@ -37,7 +37,9 @@ let package = Package(
                 "Libavcodec", "Libavdevice", "Libavfilter", "Libavformat", "Libavutil", "Libswresample", "Libswscale",
                 "Libssl", "Libcrypto", "Libass", "Libfreetype", "Libfribidi", "Libharfbuzz",
                 "MoltenVK", "Libshaderc_combined", "lcms2", "Libplacebo", "Libdovi", "Libunibreak",
-                "Libdav1d", "Libuavs3d", "Liblcevc_dec"
+                "Libdav1d", "Libuavs3d",
+                "Liblcevc_dec_api", "Liblcevc_dec_api_utility", "Liblcevc_dec_common", "Liblcevc_dec_enhancement",
+                "Liblcevc_dec_extract", "Liblcevc_dec_pipeline", "Liblcevc_dec_pipeline_cpu", "Liblcevc_dec_pixel_processing"
             ],
             path: "Sources/_FFmpeg",
             linkerSettings: [

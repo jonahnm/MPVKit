@@ -205,14 +205,17 @@ enum Library: String, CaseIterable {
                 ),
             ]
         case .liblcevc_dec:
-            return [
+            // One binary target per SDK component; the frameworks ship from
+            // the release tarball like the FFmpeg frameworks.
+            return ["api", "api_utility", "common", "enhancement", "extract",
+                    "pipeline", "pipeline_cpu", "pixel_processing"].map {
                 .target(
-                    name: "Liblcevc_dec",
+                    name: "Liblcevc_dec_\($0)",
                     url:
-                        "https://github.com/jonahnm/MPVKit/releases/download/\(BaseBuild.options.releaseVersion)/Liblcevc_dec.xcframework.zip",
+                        "https://github.com/jonahnm/MPVKit/releases/download/\(BaseBuild.options.releaseVersion)/Liblcevc_dec_\($0).xcframework.zip",
                     checksum: ""
                 )
-            ]
+            }
         case .openssl:
             return [
                 .target(
@@ -473,28 +476,38 @@ private class BuildLcevcDec: BaseBuild {
         try super.build(platform: platform, arch: arch)
 
         // LCEVCdec installs one archive per component (liblcevc_dec_api.a,
-        // liblcevc_dec_common.a, ...). FFmpeg links the whole SDK through the
-        // lcevc_dec pkg-config, and the framework step lips one archive per
-        // framework, so merge the components into a single Lib<Name>.a the
-        // framework step can consume.
+        // liblcevc_dec_common.a, ...). The framework step lips one archive per
+        // framework, so mirror the fork's Lib<Name>.a convention for each
+        // component while keeping the originals for the lcevc_dec pkg-config
+        // that FFmpeg's configure consumes.
         let libDir = thinDir(platform: platform, arch: arch) + "lib"
-        let archives = (try? FileManager.default.contentsOfDirectory(atPath: libDir.path))?
-            .filter { $0.hasSuffix(".a") }
+        let components = (try? FileManager.default.contentsOfDirectory(atPath: libDir.path))?
+            .filter { $0.hasPrefix("liblcevc_dec_") && $0.hasSuffix(".a") }
             .sorted() ?? []
-        guard !archives.isEmpty else {
-            return
+        for name in components {
+            let capitalized = "Lib" + name.dropFirst(3)
+            let destination = libDir + capitalized
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.copyItem(at: libDir + name, to: destination)
         }
-        let combined = libDir + "Liblcevc_dec.a"
-        try? FileManager.default.removeItem(at: combined)
-        var arguments = ["-static", "-o", combined.path]
-        arguments += archives.map { (libDir + $0).path }
-        try Utility.launch(path: "/usr/bin/libtool", arguments: arguments)
+    }
 
-        // flagsDependencelibrarys links -llcevc_dec into dependent builds, so
-        // also expose the merged archive under the pkg-config library name.
-        let pkgName = libDir + "liblcevc_dec.a"
-        try? FileManager.default.removeItem(at: pkgName)
-        try FileManager.default.copyItem(at: combined, to: pkgName)
+    override func frameworks() throws -> [String] {
+        // One framework per LCEVCdec component archive so libavcodec's
+        // LCEVC symbol references resolve at app link time.
+        var frameworks: [String] = []
+        if let platform = platforms().first {
+            if let arch = platform.architectures.first {
+                let lib = thinDir(platform: platform, arch: arch) + "lib"
+                let fileNames = try FileManager.default.contentsOfDirectory(atPath: lib.path)
+                for fileName in fileNames {
+                    if fileName.hasPrefix("Liblcevc_dec_"), fileName.hasSuffix(".a") {
+                        frameworks.append(fileName.dropLast(2).description)
+                    }
+                }
+            }
+        }
+        return frameworks.sorted()
     }
 }
 
@@ -525,7 +538,10 @@ private class BuildFFMPEG: BaseBuild {
     }
 
     override func flagsDependencelibrarys() -> [Library] {
-        [.libdovi, .liblcevc_dec]
+        // liblcevc_dec is intentionally absent: FFmpeg's configure resolves
+        // it through the lcevc_dec pkg-config (picked up by PKG_CONFIG_LIBDIR),
+        // and the generic -llcevc_dec link flag has no matching archive.
+        [.libdovi]
     }
 
     override func frameworks() throws -> [String] {
