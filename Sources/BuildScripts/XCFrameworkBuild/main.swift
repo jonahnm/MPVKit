@@ -498,13 +498,18 @@ private class BuildLcevcDec: BaseBuild {
         try Utility.launch(path: cmake, arguments: configureArgs, currentDirectoryURL: buildURL, environment: environ)
         try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ)
         try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ)
+        let libDir = thinDir(platform: platform, arch: arch) + "lib"
+        if let names = try? FileManager.default.contentsOfDirectory(atPath: libDir.path) {
+            print("liblcevc_dec thin lib dir contents: \(names)")
+        } else {
+            print("liblcevc_dec thin lib dir missing: \(libDir.path)")
+        }
 
         // LCEVCdec installs one archive per component (liblcevc_dec_api.a,
         // liblcevc_dec_common.a, ...). The framework step lips one archive per
         // framework, so mirror the fork's Lib<Name>.a convention for each
         // component while keeping the originals for the lcevc_dec pkg-config
         // that FFmpeg's configure consumes.
-        let libDir = thinDir(platform: platform, arch: arch) + "lib"
         let components = (try? FileManager.default.contentsOfDirectory(atPath: libDir.path))?
             .filter { $0.hasPrefix("liblcevc_dec_") && $0.hasSuffix(".a") }
             .sorted() ?? []
