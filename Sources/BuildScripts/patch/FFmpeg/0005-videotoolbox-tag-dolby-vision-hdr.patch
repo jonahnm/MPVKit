@@ -1,24 +1,8 @@
-From 9b0b21e341b7c5406a7e5e5b35e2d8f9b27e1a0f Mon Sep 17 00:00:00 2001
-From: edde746 <86283021+edde746@users.noreply.github.com>
-Date: Thu, 7 May 2026 17:30:00 +0200
-Subject: [PATCH] videotoolbox: tag Dolby Vision output as HDR
-
-Ensure Apple Dolby Vision VideoToolbox sessions advertise HDR color
-description extensions and decoded pixel buffers carry BT.2020 HDR
-attachments when the Dolby Vision stream has an HDR10/HLG-compatible
-base layer. Profile 5 is left to VideoToolbox's native Dolby Vision
-metadata because its base is not BT.2020 YCbCr. Also enable
-VideoToolbox's per-frame HDR display metadata propagation/generation
-where the OS supports it.
----
- libavcodec/videotoolbox.c | 121 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 121 insertions(+)
-
 diff --git a/libavcodec/videotoolbox.c b/libavcodec/videotoolbox.c
-index 294fc4e..374a3c7 100644
+index cb7e185..fd8858f 100644
 --- a/libavcodec/videotoolbox.c
 +++ b/libavcodec/videotoolbox.c
-@@ -121,6 +121,8 @@ int ff_videotoolbox_buffer_append(VTContext *vtctx,
+@@ -125,6 +125,8 @@ int ff_videotoolbox_buffer_append(VTContext *vtctx,
  }
  
  static int videotoolbox_dovi_should_preserve_attachments(AVCodecContext *avctx);
@@ -27,7 +11,7 @@ index 294fc4e..374a3c7 100644
  
  static int videotoolbox_postproc_frame(void *avctx, AVFrame *frame)
  {
-@@ -141,6 +143,7 @@ static int videotoolbox_postproc_frame(void *avctx, AVFrame *frame)
+@@ -145,6 +147,7 @@ static int videotoolbox_postproc_frame(void *avctx, AVFrame *frame)
      if (!videotoolbox_dovi_should_preserve_attachments(avctx) &&
          (ret = av_vt_pixbuf_set_attachments(avctx, ref->pixbuf, frame)) < 0)
          return ret;
@@ -35,7 +19,7 @@ index 294fc4e..374a3c7 100644
  
      frame->data[3] = (uint8_t*)ref->pixbuf;
  
-@@ -872,6 +875,80 @@ static int videotoolbox_dovi_should_preserve_attachments(AVCodecContext *avctx)
+@@ -878,6 +881,80 @@ static int videotoolbox_dovi_should_preserve_attachments(AVCodecContext *avctx)
      return videotoolbox_dovi_is_apple_hevc(videotoolbox_dovi_get_conf(avctx));
  }
  
@@ -116,7 +100,7 @@ index 294fc4e..374a3c7 100644
  enum PlezyDoviConversionMode {
      PLEZY_DOVI_AUTO,
      PLEZY_DOVI_DISABLED,
-@@ -940,6 +1017,20 @@ static CFDictionaryRef videotoolbox_decoder_config_create(CMVideoCodecType codec
+@@ -1006,6 +1083,20 @@ static CFDictionaryRef videotoolbox_decoder_config_create(CMVideoCodecType codec
                              kVTVideoDecoderSpecification_RequireHardwareAcceleratedVideoDecoder,
                           kCFBooleanTrue);
  
@@ -137,7 +121,7 @@ index 294fc4e..374a3c7 100644
      avc_info = CFDictionaryCreateMutable(kCFAllocatorDefault,
                                           1,
                                           &kCFTypeDictionaryKeyCallBacks,
-@@ -1124,6 +1215,36 @@ static int videotoolbox_start(AVCodecContext *avctx)
+@@ -1213,6 +1304,36 @@ static int videotoolbox_start(AVCodecContext *avctx)
                                            &decoder_cb,               // outputCallback
                                            &videotoolbox->session);   // decompressionSessionOut
  
@@ -174,5 +158,3 @@ index 294fc4e..374a3c7 100644
      if (decoder_spec)
          CFRelease(decoder_spec);
      if (buf_attr)
--- 
-2.50.1 (Apple Git-155)

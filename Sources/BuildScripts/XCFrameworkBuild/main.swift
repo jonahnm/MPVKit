@@ -23,6 +23,7 @@ do {
     try BuildLittleCms().buildALL()
     try BuildPlacebo().buildALL()
     try BuildDav1d().buildALL()
+    try BuildLcevcDec().buildALL()
     try BuildFFMPEG().buildALL()
 
     // mpv
@@ -35,23 +36,26 @@ do {
 }
 
 enum Library: String, CaseIterable {
-    case libmpv, FFmpeg, libshaderc, vulkan, lcms2, libdovi, openssl, libunibreak, libfreetype,
+    case libmpv, FFmpeg, liblcevc_dec, libshaderc, vulkan, lcms2, libdovi, openssl, libunibreak, libfreetype,
         libfribidi, libharfbuzz, libass, libplacebo, libdav1d, libuchardet, libbluray, libluajit, libuavs3d
     var version: String {
         switch self {
         case .libmpv:
             return "v0.41.0"
         case .FFmpeg:
-            // n8.1.x fixes crash-class bugs in the first-generation native
-            // VVC (H.266) decoder shipped in n8.0.x: slices keep RefStruct
-            // references to the parameter sets they use (use-after-free when
-            // in-band SPS/PPS updates replace them), SPS/seq_decode stay in
-            // lockstep, and RASL "missing ref" false alarms stop corrupting
-            // reference management. VVC direct play crashed the process a
-            // couple of seconds into playback with n8.0.1.
-            return "n8.1.2"
+            // Track master for LCEVC (MPEG-5) enhancement-layer decoding.
+            // liblcevc-dec and the native cbs_lcevc/lcevc_metadata support
+            // only exist on master; the n8.1.x branch has no LCEVC decoder.
+            // The fork patch series is rebased onto a known master snapshot
+            // (9862dd8); if a master move breaks the patch series the build
+            // fails loudly and the patches must be rebased again.
+            return "master"
         case .openssl:
             return "3.3.5"
+        case .liblcevc_dec:
+            // LCEVCdec (V-Nova reference MPEG-5 LCEVC decoder). FFmpeg master
+            // requires lcevc_dec >= 4.0.0 for --enable-liblcevc-dec.
+            return "4.2.0"
         case .libass:
             return "0.18.3"
         case .libunibreak:
@@ -91,6 +95,8 @@ enum Library: String, CaseIterable {
             return "https://github.com/mpv-player/mpv"
         case .FFmpeg:
             return "https://github.com/FFmpeg/FFmpeg"
+        case .liblcevc_dec:
+            return "https://github.com/v-novaltd/LCEVCdec"
         case .openssl:
             return
                 "https://github.com/mpvkit/openssl-build/releases/download/\(self.version)/openssl-all.zip"
@@ -197,6 +203,15 @@ enum Library: String, CaseIterable {
                         "https://github.com/jonahnm/MPVKit/releases/download/\(BaseBuild.options.releaseVersion)/Libswscale.xcframework.zip",
                     checksum: ""
                 ),
+            ]
+        case .liblcevc_dec:
+            return [
+                .target(
+                    name: "Liblcevc_dec",
+                    url:
+                        "https://github.com/jonahnm/MPVKit/releases/download/\(BaseBuild.options.releaseVersion)/Liblcevc_dec.xcframework.zip",
+                    checksum: ""
+                )
             ]
         case .openssl:
             return [
@@ -440,6 +455,49 @@ private class BuildMPV: BaseBuild {
 
 }
 
+private class BuildLcevcDec: BaseBuild {
+    init() {
+        super.init(library: .liblcevc_dec)
+    }
+
+    override func arguments(platform: PlatformType, arch: ArchType) -> [String] {
+        [
+            "-DVN_SDK_EXECUTABLES=OFF",
+            "-DVN_SDK_UNIT_TESTS=OFF",
+            "-DVN_SDK_DOCS=OFF",
+            "-DVN_SDK_SYSTEM_INSTALL=OFF",
+        ]
+    }
+
+    override func build(platform: PlatformType, arch: ArchType) throws {
+        try super.build(platform: platform, arch: arch)
+
+        // LCEVCdec installs one archive per component (liblcevc_dec_api.a,
+        // liblcevc_dec_common.a, ...). FFmpeg links the whole SDK through the
+        // lcevc_dec pkg-config, and the framework step lips one archive per
+        // framework, so merge the components into a single Lib<Name>.a the
+        // framework step can consume.
+        let libDir = thinDir(platform: platform, arch: arch) + "lib"
+        let archives = (try? FileManager.default.contentsOfDirectory(atPath: libDir.path))?
+            .filter { $0.hasSuffix(".a") }
+            .sorted() ?? []
+        guard !archives.isEmpty else {
+            return
+        }
+        let combined = libDir + "Liblcevc_dec.a"
+        try? FileManager.default.removeItem(at: combined)
+        var arguments = ["-static", "-o", combined.path]
+        arguments += archives.map { (libDir + $0).path }
+        try Utility.launch(path: "/usr/bin/libtool", arguments: arguments)
+
+        // flagsDependencelibrarys links -llcevc_dec into dependent builds, so
+        // also expose the merged archive under the pkg-config library name.
+        let pkgName = libDir + "liblcevc_dec.a"
+        try? FileManager.default.removeItem(at: pkgName)
+        try FileManager.default.copyItem(at: combined, to: pkgName)
+    }
+}
+
 private class BuildFFMPEG: BaseBuild {
     init() {
         super.init(library: .FFmpeg)
@@ -467,7 +525,7 @@ private class BuildFFMPEG: BaseBuild {
     }
 
     override func flagsDependencelibrarys() -> [Library] {
-        [.libdovi]
+        [.libdovi, .liblcevc_dec]
     }
 
     override func frameworks() throws -> [String] {
@@ -593,12 +651,19 @@ private class BuildFFMPEG: BaseBuild {
         let dependencyLibrary = [
             Library.libfreetype, .libharfbuzz, .libfribidi, .libass, .vulkan,
             .libshaderc, .lcms2, .libplacebo, .libdav1d, .libuavs3d, .openssl,
+            .liblcevc_dec,
         ]
         for library in dependencyLibrary {
             let path =
                 URL.currentDirectory + [library.rawValue, platform.rawValue, "thin", arch.rawValue]
             if FileManager.default.fileExists(atPath: path.path) {
-                arguments.append("--enable-\(library.rawValue)")
+                if library == .liblcevc_dec {
+                    // The configure option is hyphenated while the Library
+                    // case is underscored: --enable-liblcevc-dec.
+                    arguments.append("--enable-liblcevc-dec")
+                } else {
+                    arguments.append("--enable-\(library.rawValue)")
+                }
                 if library == .libdav1d || library == .libuavs3d {
                     arguments.append("--enable-decoder=\(library.rawValue)")
                 } else if library == .libass {
@@ -606,6 +671,8 @@ private class BuildFFMPEG: BaseBuild {
                     arguments.append("--enable-filter=subtitles")
                 } else if library == .libplacebo {
                     arguments.append("--enable-filter=libplacebo")
+                } else if library == .liblcevc_dec {
+                    arguments.append("--enable-filter=lcevc")
                 }
             }
         }

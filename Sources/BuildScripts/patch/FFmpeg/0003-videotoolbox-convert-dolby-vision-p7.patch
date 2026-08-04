@@ -1,24 +1,5 @@
-From 1f7356fb2ed2d989266974dfaa220657005fef72 Mon Sep 17 00:00:00 2001
-From: edde746 <86283021+edde746@users.noreply.github.com>
-Date: Thu, 7 May 2026 14:15:00 +0200
-Subject: [PATCH] videotoolbox: convert Dolby Vision profile 7 to profile 8.1
-
-Use the bundled libdovi C API to rewrite profile 7 RPU NALs through its
-profile 8.1 compatibility mode before VideoToolbox decode. Enhancement-layer
-NALs are dropped and the format description advertises a synthetic P8.1 dvvC
-atom so Apple can decode the compatible base layer through its native Dolby
-Vision path.
-
-The conversion mode is selected by PLEZY_DV_CONVERSION_MODE:
-auto/dv81 convert profile 7 to profile 8.1, hevc_strip drops only
-profile 7 RPU/EL NALs on the plain HEVC path, and disabled keeps profile 7
-unchanged.
----
- libavcodec/videotoolbox.c | 175 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 171 insertions(+), 4 deletions(-)
-
 diff --git a/libavcodec/videotoolbox.c b/libavcodec/videotoolbox.c
-index d2d3b7c..df551d0 100644
+index 8d52ca5..8c82e3d 100644
 --- a/libavcodec/videotoolbox.c
 +++ b/libavcodec/videotoolbox.c
 @@ -23,6 +23,9 @@
@@ -28,10 +9,10 @@ index d2d3b7c..df551d0 100644
 +#include <libdovi/rpu_parser.h>
 +#include <stdlib.h>
 +#include <string.h>
- #include "libavutil/hwcontext_videotoolbox.h"
+ #include "libavutil/attributes.h"
  #include "libavutil/dovi_meta.h"
- #include "libavutil/mem.h"
-@@ -844,12 +847,16 @@ static const AVDOVIDecoderConfigurationRecord *videotoolbox_dovi_get_conf(AVCode
+ #include "libavutil/hwcontext_videotoolbox.h"
+@@ -846,12 +849,16 @@ static const AVDOVIDecoderConfigurationRecord *videotoolbox_dovi_get_conf(AVCode
      return (const AVDOVIDecoderConfigurationRecord *)sd->data;
  }
  
@@ -49,7 +30,7 @@ index d2d3b7c..df551d0 100644
      switch (dovi->dv_profile) {
      case 5:
          return 1;
-@@ -861,24 +864,108 @@ static int videotoolbox_dovi_is_apple_hevc(const AVDOVIDecoderConfigurationRecor
+@@ -863,24 +870,108 @@ static int videotoolbox_dovi_is_apple_hevc(const AVDOVIDecoderConfigurationRecor
      }
  }
  
@@ -162,7 +143,7 @@ index d2d3b7c..df551d0 100644
  
      return CFDataCreate(kCFAllocatorDefault, buf, sizeof(buf));
  }
-@@ -930,7 +989,9 @@ static CFDictionaryRef videotoolbox_decoder_config_create(CMVideoCodecType codec
+@@ -933,7 +1024,9 @@ static CFDictionaryRef videotoolbox_decoder_config_create(CMVideoCodecType codec
              dovi = videotoolbox_dovi_get_conf(avctx);
              dovi_data = videotoolbox_dovi_extradata_create(dovi);
              if (dovi_data)
@@ -173,10 +154,7 @@ index d2d3b7c..df551d0 100644
          }
          break;
  #if CONFIG_VP9_VIDEOTOOLBOX_HWACCEL
-@@ -987,14 +1080,40 @@ static int videotoolbox_start(AVCodecContext *avctx)
-     case AV_CODEC_ID_HEVC :
-         {
-             const AVDOVIDecoderConfigurationRecord *dovi = videotoolbox_dovi_get_conf(avctx);
+@@ -993,12 +1086,38 @@ static int videotoolbox_start(AVCodecContext *avctx)
  
              if (videotoolbox_dovi_is_apple_hevc(dovi)) {
                  videotoolbox->cm_codec_type = kCMVideoCodecType_DolbyVisionHEVC_FF;
@@ -218,7 +196,8 @@ index d2d3b7c..df551d0 100644
 +                }
              }
          }
-@@ -1180,10 +1267,81 @@ static int videotoolbox_hevc_start_frame(AVCodecContext *avctx,
+         break;
+@@ -1186,10 +1305,81 @@ static int videotoolbox_hevc_start_frame(AVCodecContext *avctx,
      return 0;
  }
  
@@ -300,5 +279,3 @@ index d2d3b7c..df551d0 100644
      return videotoolbox_common_decode_slice(avctx, buffer, size);
  }
  
--- 
-2.50.1 (Apple Git-155)

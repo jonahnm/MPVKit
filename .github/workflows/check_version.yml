@@ -78,7 +78,9 @@ jobs:
             print("ffmpeg old version:", ffmpegOldVersion)
             set_env('FFMPEG_OLD_VERSION', ffmpegOldVersion)
             ffmpegNewVersion = '${{ env.FFMPEG_LATEST_VERSION }}'
-            if parse_version(ffmpegNewVersion) > parse_version(ffmpegOldVersion) and not ffmpegOldVersion.startswith(ffmpegNewVersion):
+            # FFmpeg tracks master (for LCEVC); never replace the master pin
+            # with a release tag.
+            if not ffmpegOldVersion == 'master' and parse_version(ffmpegNewVersion) > parse_version(ffmpegOldVersion) and not ffmpegOldVersion.startswith(ffmpegNewVersion):
               content = re.sub(r'(case .FFmpeg[^"]+?)"(.+?)"', r'\1"${{ env.FFMPEG_LATEST_VERSION }}"', content, count=1)
               set_env('FOUND_NEW_FFMPEG_VERSION', '1')
 
@@ -91,7 +93,7 @@ jobs:
               content = file.read()
             if parse_version(mpvNewVersion) > parse_version(mpvOldVersion):
               content = re.sub(r'mpv-.*-blue', r'mpv-${{ env.MPV_LATEST_VERSION }}-blue', content, count=1)
-            if parse_version(ffmpegNewVersion) > parse_version(ffmpegOldVersion):
+            if not ffmpegOldVersion == 'master' and parse_version(ffmpegNewVersion) > parse_version(ffmpegOldVersion):
               content = re.sub(r'ffmpeg-.*-blue', r'ffmpeg-${{ env.FFMPEG_LATEST_VERSION }}-blue', content, count=1)
             with open(file_path, 'w', encoding='utf-8') as file:
               file.write(content)
