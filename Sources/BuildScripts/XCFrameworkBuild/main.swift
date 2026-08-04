@@ -516,9 +516,10 @@ private class BuildLcevcDec: BaseBuild {
             .sorted() ?? []
         for name in components {
             let capitalized = "Lib" + name.dropFirst(3)
-            let destination = libDir + capitalized
-            try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.copyItem(at: libDir + name, to: destination)
+            let source = (libDir + name).path
+            let destination = (libDir + capitalized).path
+            try? FileManager.default.removeItem(atPath: destination)
+            try Utility.launch(path: "/bin/cp", arguments: ["-R", source, destination])
         }
     }
 
