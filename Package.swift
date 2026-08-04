@@ -88,8 +88,8 @@ let package = Package(
 
         .binaryTarget(
             name: "Libass",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libass.xcframework.zip",
-            checksum: "1f9c2a6d6affa66f9993a45d16f06522a00f2fc4405dc914d0d3f9477603f39e"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libass.xcframework.zip",
+            checksum: "313a28c10983f1ea07d445ed765efa10a95eb5a76b68bd747da9734c5ca09fc2"
         ),
 
         .binaryTarget(
@@ -153,79 +153,79 @@ let package = Package(
 
         .binaryTarget(
             name: "Liblcevc_dec_api",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Liblcevc_dec_api.xcframework.zip",
-            checksum: "1071d3fff5b62a83c5af40c41435cdd0201a4b261c5a83e7564ead10991f8a6b"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Liblcevc_dec_api.xcframework.zip",
+            checksum: "4c05964d476e762427c6c6536b08cf29ad3c113042bb8c0a07897159ced00a5a"
         ),
         .binaryTarget(
             name: "Liblcevc_dec_api_utility",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Liblcevc_dec_api_utility.xcframework.zip",
-            checksum: "9b955e71aa94b716c5125623814e3bf13eaf81caa3374b70c70b2d1b4c920a4d"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Liblcevc_dec_api_utility.xcframework.zip",
+            checksum: "9c4554f69e24c4adb4420793e198603d72f1ea043ecac155697c7775e7b3b255"
         ),
         .binaryTarget(
             name: "Liblcevc_dec_common",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Liblcevc_dec_common.xcframework.zip",
-            checksum: "01e28cd994a6f54ea94373e18fc913460847dfeba5bdf0748651e1dc96ec03fa"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Liblcevc_dec_common.xcframework.zip",
+            checksum: "f818ea6e17ffcb1abe4ea5b5deb134daf634d99d563f19ab87c0d27ba12418a0"
         ),
         .binaryTarget(
             name: "Liblcevc_dec_enhancement",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Liblcevc_dec_enhancement.xcframework.zip",
-            checksum: "a6af4f299bb57190c3bbf87bb1a19af37d008dc4a2be2d36e189bde27d1cbf04"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Liblcevc_dec_enhancement.xcframework.zip",
+            checksum: "921ca3f6f3cef6e67cfcbc02848536e8f37224b92cedfafe447163db73a33cdb"
         ),
         .binaryTarget(
             name: "Liblcevc_dec_extract",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Liblcevc_dec_extract.xcframework.zip",
-            checksum: "a6a874762931574c9469081e061c9854859c8e9ec39e2124bfa291dfb9c95ee3"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Liblcevc_dec_extract.xcframework.zip",
+            checksum: "ca101d62cd96cf99dca05f05f1d87e4eb77f8bb775d8be9def4d6dc09e59910d"
         ),
         .binaryTarget(
             name: "Liblcevc_dec_pipeline",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Liblcevc_dec_pipeline.xcframework.zip",
-            checksum: "131dbce47828d8afe544849e36841ed6743d8ad362e1bc07372e94b9ae127541"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Liblcevc_dec_pipeline.xcframework.zip",
+            checksum: "46c5a89e9294f5a08781b9d63997f1c22291f7aa0b3e93cedf7e6c5b990ec398"
         ),
         .binaryTarget(
             name: "Liblcevc_dec_pipeline_cpu",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Liblcevc_dec_pipeline_cpu.xcframework.zip",
-            checksum: "1f2b65ec140a903e8f111e7898159f9743feea75ba0940a97f37c0f69025905e"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Liblcevc_dec_pipeline_cpu.xcframework.zip",
+            checksum: "50a6d88872766d1b7b18f701e449a3471902e0c09753df73862ce271321bb47b"
         ),
         .binaryTarget(
             name: "Liblcevc_dec_pixel_processing",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Liblcevc_dec_pixel_processing.xcframework.zip",
-            checksum: "35304ddf1f7d7634757b2f9365d54abcdece0e677a5aeaa08776868f125cad55"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Liblcevc_dec_pixel_processing.xcframework.zip",
+            checksum: "c41092f7fce2ab326196c08c2ee2c5f6d0d16bed30deae83f76f91b134342176"
         ),
 
         .binaryTarget(
             name: "Libavcodec",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libavcodec.xcframework.zip",
-            checksum: "4ba72995bc6c4b7634f01b773d4dc2f10bb9e9d8850bb0b029e260647e9a7b5f"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libavcodec.xcframework.zip",
+            checksum: "b0382ce717d2239055a56e6e67fc00f10b29e4b9e892a8a6b6730aa010824ea5"
         ),
         .binaryTarget(
             name: "Libavdevice",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libavdevice.xcframework.zip",
-            checksum: "7b4de29d21540ce79caddfb626ab882269cebdd285ff7fdc2112bd8b23eedcef"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libavdevice.xcframework.zip",
+            checksum: "37b2269046b3f7e80844baa038ae3b10ed4918a56535f1fd0f000be9566a6fbc"
         ),
         .binaryTarget(
             name: "Libavformat",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libavformat.xcframework.zip",
-            checksum: "2255687c42dfb653e1865e48fd862cf2cbfdf786da181f325af29e7f6f4da6c4"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libavformat.xcframework.zip",
+            checksum: "a788f868c7939a7bf615ae961a87298d362acccdc4d802de92ce02b7f5861f9e"
         ),
         .binaryTarget(
             name: "Libavfilter",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libavfilter.xcframework.zip",
-            checksum: "87d9e3b09d54a5d3e8758274d32bc2cd3df73fde790abf51f25a66d666d83de9"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libavfilter.xcframework.zip",
+            checksum: "a715bf8cd1474511307ce0f1d679e491c1b598bf981f267df2f11b2f21af4ea1"
         ),
         .binaryTarget(
             name: "Libavutil",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libavutil.xcframework.zip",
-            checksum: "ccd9eab2eb647a6fb3eca3b36a48743e4b32a661934a7efa0215f5005e4e2d95"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libavutil.xcframework.zip",
+            checksum: "84b55df6c1b074eb8abb95aeee70644bc91d8ece39cf2892a89e1f3f668c7982"
         ),
         .binaryTarget(
             name: "Libswresample",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libswresample.xcframework.zip",
-            checksum: "17d4b76cbddf3ead08db93d7fcedb4246e027477470c694dd3c4ceaf4dad75fe"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libswresample.xcframework.zip",
+            checksum: "3325473921e747ef36a5b854d1e7c1f5276be3fd6cef46a9fc1d8fc71dd530fb"
         ),
         .binaryTarget(
             name: "Libswscale",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libswscale.xcframework.zip",
-            checksum: "85b6c355de360c7ad0a36cfdc2625a5caba26caa09f7a4a6f2779e202f2d6b57"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libswscale.xcframework.zip",
+            checksum: "1cfcdd318db810b93360ea679756a339231c8b0d62be2442e51e86a6df95589b"
         ),
 
         .binaryTarget(
@@ -242,8 +242,8 @@ let package = Package(
 
         .binaryTarget(
             name: "Libmpv",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.19/Libmpv.xcframework.zip",
-            checksum: "c8789e804bd968f553320097ca2c7cc001e63b452c21904299c6c3c4f9fbaec6"
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.20/Libmpv.xcframework.zip",
+            checksum: "cb78cf0d791f74c302dacc03d72d72087d5a2516357d76260687d21131a29073"
         ),
         //AUTO_GENERATE_TARGETS_END//
     ]
