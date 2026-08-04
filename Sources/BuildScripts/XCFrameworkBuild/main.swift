@@ -782,6 +782,9 @@ private class BuildFFMPEG: BaseBuild {
         "--enable-demuxers",
         // ./configure --list-bsfs
         "--enable-bsfs",
+        // LCEVC enhancement-layer bitstream filters, enabled explicitly so
+        // they survive any --enable-bsfs component-list changes on master.
+        "--enable-bsf=lcevc_merge,lcevc_metadata",
         // ./configure --list-decoders
         "--enable-decoders",
 
