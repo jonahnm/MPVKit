@@ -488,8 +488,11 @@ private class BuildVvdec: BaseBuild {
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
         ]
         configureArgs += arguments(platform: platform, arch: arch)
+        // Keep the make output visible so CI failures show the actual error.
+        var buildEnv = environ
+        buildEnv["VERBOSE"] = "1"
         try Utility.launch(path: cmake, arguments: configureArgs, currentDirectoryURL: buildURL, environment: environ)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: buildEnv)
         try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ)
 
         // The vvdec installs libvvdec.a under lib64; mirror the fork's
