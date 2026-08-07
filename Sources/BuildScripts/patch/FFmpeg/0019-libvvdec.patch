@@ -1,6 +1,120 @@
-diff -ruN patchwork/ffmpeg2/ffmpeg/libavcodec/libvvdecdec.c patchwork/ffmpeg/libavcodec/libvvdecdec.c
---- patchwork/ffmpeg2/ffmpeg/libavcodec/libvvdecdec.c	1969-12-31 19:00:00.000000000 -0500
-+++ patchwork/ffmpeg/libavcodec/libvvdecdec.c	2026-08-07 19:24:13.312513485 -0400
+diff --git a/configure b/configure
+index f2896b81c7..b5e455f957 100755
+--- a/configure
++++ b/configure
+@@ -298,6 +298,7 @@ External library support:
+   --enable-libvorbis       enable Vorbis en/decoding via libvorbis,
+                            native implementation exists [no]
+   --enable-libvpx          enable VP8 and VP9 de/encoding via libvpx [no]
++  --enable-libvvdec        enable VVC decoding via libvvdec [no]
+   --enable-libvvenc        enable H.266/VVC encoding via vvenc [no]
+   --enable-libwebp         enable WebP encoding via libwebp [no]
+   --enable-libx264         enable H.264 encoding via x264 [no]
+@@ -2111,6 +2112,7 @@ EXTERNAL_LIBRARY_LIST="
+     libvmaf
+     libvorbis
+     libvpx
++    libvvdec
+     libvvenc
+     libwebp
+     libxevd
+@@ -3873,6 +3875,7 @@ libvorbis_decoder_deps="libvorbis"
+ libvorbis_encoder_deps="libvorbis libvorbisenc"
+ libvorbis_encoder_select="audio_frame_queue"
+ libvpx_vp8_decoder_deps="libvpx"
++libvvdec_decoder_deps="libvvdec"
+ libvpx_vp8_encoder_deps="libvpx"
+ libvpx_vp9_decoder_deps="libvpx"
+ libvpx_vp9_encoder_deps="libvpx"
+@@ -6428,8 +6431,8 @@ probe_libc(){
+         if ! test_${pfx}cpp_condition crtdefs.h "defined(_UCRT)"; then
+             add_${pfx}cppflags -D__USE_MINGW_ANSI_STDIO=1
+         fi
+-        test_${pfx}cpp_condition windows.h "!defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601" &&
+-            add_${pfx}cppflags -D_WIN32_WINNT=0x0601
++        test_${pfx}cpp_condition windows.h "!defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600" &&
++            add_${pfx}cppflags -D_WIN32_WINNT=0x0600
+         add_${pfx}cppflags -D_POSIX_C_SOURCE=200112 -D_XOPEN_SOURCE=600
+     elif test_${pfx}cpp_condition _mingw.h "defined __MINGW_VERSION"  ||
+          test_${pfx}cpp_condition _mingw.h "defined __MINGW32_VERSION"; then
+@@ -6443,8 +6446,8 @@ probe_libc(){
+         fi
+         test_${pfx}cpp_condition _mingw.h "__MSVCRT_VERSION__ < 0x0700" &&
+             add_${pfx}cppflags -D__MSVCRT_VERSION__=0x0700
+-        test_${pfx}cpp_condition windows.h "!defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601" &&
+-            add_${pfx}cppflags -D_WIN32_WINNT=0x0601
++        test_${pfx}cpp_condition windows.h "!defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600" &&
++            add_${pfx}cppflags -D_WIN32_WINNT=0x0600
+         add_${pfx}cppflags -D_POSIX_C_SOURCE=200112 -D_XOPEN_SOURCE=600
+     elif test_${pfx}cpp_condition crtversion.h "defined _VC_CRT_MAJOR_VERSION"; then
+         eval ${pfx}libc_type=msvcrt
+@@ -6459,8 +6462,18 @@ probe_libc(){
+             fi
+         fi
+         add_${pfx}cppflags -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS
+-        test_${pfx}cpp_condition windows.h "!defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601" &&
+-            add_${pfx}cppflags -D_WIN32_WINNT=0x0601
++        # The MSVC 2010 headers (Win 7.0 SDK) set _WIN32_WINNT to
++        # 0x601 by default unless something else is set by the user.
++        # This can easily lead to us detecting functions only present
++        # in such new versions and producing binaries requiring windows 7.0.
++        # Therefore explicitly set the default to Vista unless the user has
++        # set something else on the command line.
++        # Don't do this if WINAPI_FAMILY is set and is set to a non-desktop
++        # family. For these cases, configure is free to use any functions
++        # found in the SDK headers by default. (Alternatively, we could force
++        # _WIN32_WINNT to 0x0602 in that case.)
++        test_${pfx}cpp_condition stdlib.h "defined(_WIN32_WINNT)" ||
++            { test_${pfx}cpp <<EOF && add_${pfx}cppflags -D_WIN32_WINNT=0x0600; }
+ #ifdef WINAPI_FAMILY
+ #include <winapifamily.h>
+ #if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+@@ -7030,7 +7043,7 @@ check_headers direct.h
+ check_headers dirent.h
+ check_headers dxgidebug.h
+ check_headers dxva.h
+-check_headers dxva2api.h
++check_headers dxva2api.h -D_WIN32_WINNT=0x0600
+ check_headers io.h
+ enabled libdrm &&
+     check_headers linux/dma-buf.h
+@@ -7465,6 +7478,7 @@ enabled libvpx            && {
+     fi
+ }
+ 
++enabled libvvdec          && require_pkg_config libvvdec libvvdec "vvdec/vvdec.h" vvdec_decoder_open
+ enabled libvvenc          && require_pkg_config libvvenc "libvvenc >= 1.6.1" "vvenc/vvenc.h" vvenc_get_version
+ enabled libwebp           && {
+     enabled libwebp_encoder      && require_pkg_config libwebp "libwebp >= 0.2.0" webp/encode.h WebPGetEncoderVersion
+diff --git a/libavcodec/Makefile b/libavcodec/Makefile
+index e464811af6..c5fe6a70f3 100644
+--- a/libavcodec/Makefile
++++ b/libavcodec/Makefile
+@@ -1231,6 +1231,7 @@ OBJS-$(CONFIG_LIBVPX_VP8_DECODER)         += libvpxdec.o
+ OBJS-$(CONFIG_LIBVPX_VP8_ENCODER)         += libvpxenc.o
+ OBJS-$(CONFIG_LIBVPX_VP9_DECODER)         += libvpxdec.o
+ OBJS-$(CONFIG_LIBVPX_VP9_ENCODER)         += libvpxenc.o
++OBJS-$(CONFIG_LIBVVDEC_DECODER)           += libvvdecdec.o
+ OBJS-$(CONFIG_LIBVVENC_ENCODER)           += libvvenc.o
+ OBJS-$(CONFIG_LIBWEBP_ENCODER)            += libwebpenc_common.o libwebpenc.o
+ OBJS-$(CONFIG_LIBWEBP_ANIM_ENCODER)       += libwebpenc_common.o libwebpenc_animencoder.o
+diff --git a/libavcodec/allcodecs.c b/libavcodec/allcodecs.c
+index 2d7496a20d..4878c0db27 100644
+--- a/libavcodec/allcodecs.c
++++ b/libavcodec/allcodecs.c
+@@ -382,6 +382,7 @@ extern const FFCodec ff_vp9_rkmpp_decoder;
+ extern const FFCodec ff_vp9_v4l2m2m_decoder;
+ extern const FFCodec ff_vqa_decoder;
+ extern const FFCodec ff_vqc_decoder;
++extern const FFCodec ff_libvvdec_decoder;
+ extern const FFCodec ff_vvc_decoder;
+ extern const FFCodec ff_wbmp_decoder;
+ extern const FFCodec ff_wbmp_encoder;
+diff --git a/libavcodec/libvvdecdec.c b/libavcodec/libvvdecdec.c
+new file mode 100644
+index 0000000000..edd4deee17
+--- /dev/null
++++ b/libavcodec/libvvdecdec.c
 @@ -0,0 +1,320 @@
 +/*
 + * VVC (Versatile Video Coding) decoder using the Fraunhofer vvdec library
