@@ -202,15 +202,6 @@ enum Library: String, CaseIterable {
                     checksum: ""
                 ),
             ]
-        case .libvvdec:
-            return [
-                .target(
-                    name: "Liblvvdec",
-                    url:
-                        "https://github.com/jonahnm/MPVKit/releases/download/\(BaseBuild.options.releaseVersion)/Liblvvdec.xcframework.zip",
-                    checksum: ""
-                )
-            ]
         case .openssl:
             return [
                 .target(
@@ -495,20 +486,25 @@ private class BuildVvdec: BaseBuild {
         try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: buildEnv)
         try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ)
 
-        // The vvdec installs libvvdec.a under lib64; mirror the fork's
-        // Lib<Name>.a convention into the thin lib dir for the framework step.
+        // The vvdec installs under lib64; expose the archive and the
+        // pkg-config file from the thin lib dir so FFmpeg's configure can
+        // resolve and link libvvdec directly (no separate framework).
         let libDir = thinDir(platform: platform, arch: arch) + "lib"
         let lib64 = thinDir(platform: platform, arch: arch) + "lib64"
-        let source = (lib64 + "libvvdec.a").path
-        let destination = (libDir + "Libvvdec.a").path
-        if FileManager.default.fileExists(atPath: source) {
-            try? FileManager.default.removeItem(atPath: destination)
-            try Utility.launch(path: "/bin/cp", arguments: ["-R", source, destination])
+        let archive = (lib64 + "libvvdec.a").path
+        if FileManager.default.fileExists(atPath: archive) {
+            try Utility.launch(path: "/bin/cp", arguments: ["-R", archive, (libDir + "libvvdec.a").path])
+        }
+        let pc = (lib64 + "pkgconfig" + "libvvdec.pc").path
+        let pcDir = libDir + "pkgconfig"
+        try? FileManager.default.createDirectory(at: pcDir, withIntermediateDirectories: true, attributes: nil)
+        if FileManager.default.fileExists(atPath: pc) {
+            try Utility.launch(path: "/bin/cp", arguments: ["-R", pc, (pcDir + "libvvdec.pc").path])
         }
     }
 
     override func frameworks() throws -> [String] {
-        ["Libvvdec"]
+        []
     }
 }
 

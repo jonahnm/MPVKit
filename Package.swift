@@ -38,7 +38,7 @@ let package = Package(
                 "Libssl", "Libcrypto", "Libass", "Libfreetype", "Libfribidi", "Libharfbuzz",
                 "MoltenVK", "Libshaderc_combined", "lcms2", "Libplacebo", "Libdovi", "Libunibreak",
                 "Libdav1d", "Libuavs3d",
-                "Liblvvdec"
+
             ],
             path: "Sources/_FFmpeg",
             linkerSettings: [
@@ -151,11 +151,7 @@ let package = Package(
         ),
 
 
-        .binaryTarget(
-            name: "Liblvvdec",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblvvdec.xcframework.zip",
-            checksum: ""
-        ),
+
 
         .binaryTarget(
             name: "Libavcodec",
