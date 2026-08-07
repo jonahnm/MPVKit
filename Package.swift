@@ -37,9 +37,7 @@ let package = Package(
                 "Libavcodec", "Libavdevice", "Libavfilter", "Libavformat", "Libavutil", "Libswresample", "Libswscale",
                 "Libssl", "Libcrypto", "Libass", "Libfreetype", "Libfribidi", "Libharfbuzz",
                 "MoltenVK", "Libshaderc_combined", "lcms2", "Libplacebo", "Libdovi", "Libunibreak",
-                "Libdav1d", "Libuavs3d",
-                "Liblcevc_dec_api", "Liblcevc_dec_api_utility", "Liblcevc_dec_common", "Liblcevc_dec_enhancement",
-                "Liblcevc_dec_extract", "Liblcevc_dec_pipeline", "Liblcevc_dec_pipeline_cpu", "Liblcevc_dec_pixel_processing"
+                "Libdav1d", "Libuavs3d"
             ],
             path: "Sources/_FFmpeg",
             linkerSettings: [
@@ -89,7 +87,7 @@ let package = Package(
         .binaryTarget(
             name: "Libass",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libass.xcframework.zip",
-            checksum: "bcc72e3203eeb9e603f218239afd08b0370012fabdd94d4d557f6c06457e5348"
+            checksum: "2f1106c58586137dbdf7f06e5554299ba5f357a6635b07260568d9c37f0d525d"
         ),
 
         .binaryTarget(
@@ -154,37 +152,37 @@ let package = Package(
         .binaryTarget(
             name: "Libavcodec",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libavcodec.xcframework.zip",
-            checksum: "ca950710534bfcc17257c8a08400446cd930210421c0b75b6e4a84a8d02658cf"
+            checksum: "cf77ff4402aa4138084d10b5de04d019a3a35a9b10cbf4d24db54e797ebdc60a"
         ),
         .binaryTarget(
             name: "Libavdevice",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libavdevice.xcframework.zip",
-            checksum: "bb746e04a836cbff35c34dcf5f1214fc651a1dfc5c9549b5c72c183ef1c40e5f"
+            checksum: "16b55fce2834de60ca8d83d7fe4bae03898b3b73042b5925ac50ef97dd92539e"
         ),
         .binaryTarget(
             name: "Libavformat",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libavformat.xcframework.zip",
-            checksum: "57d178d259ff66f93c27e541d435500e1dd2b2c81bc184f165a376396c1ea1dc"
+            checksum: "166898b4afba3ac9d75733b30ae00de14703f65bee371ca2943fa2435acb8f3a"
         ),
         .binaryTarget(
             name: "Libavfilter",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libavfilter.xcframework.zip",
-            checksum: "ecadf0d149a2e1c23e02b1a1f9b20862e5630679f6ceb3e77359bd536d6e8317"
+            checksum: "8cd716d688b7a028ad3399fab2c51b768d402f9cc5ee69cc0028a0faaed9e2c1"
         ),
         .binaryTarget(
             name: "Libavutil",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libavutil.xcframework.zip",
-            checksum: "cef8eda961e677bc0994328d468131151829d81bc77620124a9a3c1acf644fe8"
+            checksum: "7bee731112c28eea0dbf842e99873288d5f7cf757973adce3223721ecad9958a"
         ),
         .binaryTarget(
             name: "Libswresample",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libswresample.xcframework.zip",
-            checksum: "d45957f05ec36c97a4714e6d695133958292167b99cc0351ad1065d98ec41d84"
+            checksum: "f8ae8774d81d78827e52d551de3632a0d5f49018ea69a105ab7ebc77b5c4685d"
         ),
         .binaryTarget(
             name: "Libswscale",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libswscale.xcframework.zip",
-            checksum: "90e2c13cc8a5ac5edfab7ec385d645528c0831db9e911867d7657f5bcb392fea"
+            checksum: "88b234fa8eadd51be6d9399f6aa092cabd5648aa585417b26c706f8d972fd63e"
         ),
 
         .binaryTarget(
@@ -202,7 +200,7 @@ let package = Package(
         .binaryTarget(
             name: "Libmpv",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.24/Libmpv.xcframework.zip",
-            checksum: "aa400500eb82df0e3d77551b3b47db43f7db0547e09a455f2bc96449ebe35eed"
+            checksum: "6753d3abb0f0aea926f5bb73b939d68d91e0e0164b3a3b28832591072e367f2e"
         ),
         //AUTO_GENERATE_TARGETS_END//
     ]
