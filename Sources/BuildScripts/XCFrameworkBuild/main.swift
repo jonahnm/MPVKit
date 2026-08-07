@@ -496,6 +496,9 @@ private class BuildVvdec: BaseBuild {
         let archive = (lib64 + "libvvdec.a").path
         if FileManager.default.fileExists(atPath: archive) {
             try Utility.launch(path: "/bin/cp", arguments: ["-R", archive, (libDir + "libvvdec.a").path])
+            // Re-index with the BSD symbol table so Apple's toolchain
+            // (lipo/bitcode_strip) can parse the archive.
+            try Utility.launch(path: "/usr/bin/ranlib", arguments: [(libDir + "libvvdec.a").path])
         }
         let pc = (lib64 + "pkgconfig" + "libvvdec.pc").path
         let pcDir = libDir + "pkgconfig"
