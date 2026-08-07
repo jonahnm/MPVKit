@@ -55,6 +55,7 @@ let package = Package(
                 .linkedLibrary("xml2"),
                 .linkedLibrary("z"),
                 .linkedLibrary("c++"),
+                .linkedLibrary("vvdec"),
             ]
         ),
 

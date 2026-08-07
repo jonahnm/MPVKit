@@ -619,6 +619,28 @@ private class BuildFFMPEG: BaseBuild {
 
     }
 
+    override func createXCFramework() throws {
+        try super.createXCFramework()
+        // Ship the thin vvdec archive inside each Libavcodec framework slice
+        // so the app can link the vvdec symbols directly from the
+        // xcframework. lipo cannot fat-ize archives containing vvdec
+        // objects ("Unknown header: 0xb17c0de").
+        let xcfDir = xcframeworkDirectoryURL + "Libavcodec.xcframework"
+        guard FileManager.default.fileExists(atPath: xcfDir.path) else { return }
+        let slices = (try? FileManager.default.contentsOfDirectory(atPath: xcfDir.path)) ?? []
+        for slice in slices where !slice.hasPrefix(".") && slice != "Info.plist" {
+            let frameworkDir = xcfDir + [slice, "Libavcodec.framework"]
+            guard FileManager.default.fileExists(atPath: frameworkDir.path) else { continue }
+            let arch: ArchType = slice.contains("arm64e") ? .arm64e : (slice.contains("x86_64") ? .x86_64 : .arm64)
+            for platform in platforms() where slice.hasPrefix(platform.rawValue) {
+                let vvdecLib = thinDir(library: .libvvdec, platform: platform, arch: arch) + "lib/libvvdec.a"
+                if FileManager.default.fileExists(atPath: vvdecLib.path) {
+                    try Utility.launch(path: "/bin/cp", arguments: ["-R", vvdecLib.path, (frameworkDir + "libvvdec.a").path])
+                }
+            }
+        }
+    }
+
     override func arguments(platform: PlatformType, arch: ArchType) -> [String] {
         var arguments = ffmpegConfiguers
         if BaseBuild.options.enableDebug {
