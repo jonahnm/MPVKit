@@ -149,14 +149,7 @@ enum Library: String, CaseIterable {
     var targets: [PackageTarget] {
         switch self {
         case .libvvdec:
-            return [
-                .target(
-                    name: "Libvvdec",
-                    url:
-                        "https://github.com/jonahnm/MPVKit/releases/download/\(BaseBuild.options.releaseVersion)/Libvvdec.xcframework.zip",
-                    checksum: ""
-                )
-            ]
+            return []
         case .libmpv:
             return [
                 .target(
@@ -503,10 +496,6 @@ private class BuildVvdec: BaseBuild {
         let archive = (lib64 + "libvvdec.a").path
         if FileManager.default.fileExists(atPath: archive) {
             try Utility.launch(path: "/bin/cp", arguments: ["-R", archive, (libDir + "libvvdec.a").path])
-            // Re-index the framework archive with the BSD symbol table so
-            // lipo/xcodebuild can create/read the fat archive.
-            try Utility.launch(path: "/bin/cp", arguments: ["-R", archive, (libDir + "Libvvdec.a").path])
-            try Utility.launch(path: "/usr/bin/ranlib", arguments: [(libDir + "Libvvdec.a").path])
         }
         let pc = (lib64 + "pkgconfig" + "libvvdec.pc").path
         let pcDir = libDir + "pkgconfig"
@@ -517,10 +506,7 @@ private class BuildVvdec: BaseBuild {
     }
 
     override func frameworks() throws -> [String] {
-        // Ship libvvdec as its own framework so the app can resolve the vvdec
-        // symbols referenced by FFmpeg's libvvdecdec.o. Merging the archives
-        // breaks lipo's fat-archive creation ("Unknown header: 0xb17c0de").
-        ["libvvdec"]
+        []
     }
 }
 
