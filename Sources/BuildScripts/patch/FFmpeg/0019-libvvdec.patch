@@ -1,0 +1,350 @@
+diff --git a/libavcodec/libvvdecdec.c b/libavcodec/libvvdecdec.c
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/libavcodec/libvvdecdec.c
+@@ -0,0 +1,287 @@
++/*
++ * VVC (Versatile Video Coding) decoder using the Fraunhofer vvdec library
++ *
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include <vvdec/vvdec.h>
++
++#include "libavutil/bswap.h"
++#include "libavutil/intreadwrite.h"
++#include "libavutil/bswap.h"
++#include "libavutil/intreadwrite.h"
++#include "libavutil/imgutils.h"
++#include "libavutil/mem.h"
++#include "libavutil/opt.h"
++#include "libavutil/pixdesc.h"
++
++#include "avcodec.h"
++#include "codec_internal.h"
++#include "decode.h"
++#include "internal.h"
++
++typedef struct LibvvdecContext {
++    const AVClass *class;
++    vvdecDecoder *decoder;
++
++    int parse_delay;
++} LibvvdecContext;
++
++static void libvvdec_log(void *opaque, int level, const char *msg, va_list args)
++{
++    AVCodecContext *avctx = opaque;
++    av_vlog(avctx, AV_LOG_WARNING, msg, args);
++}
++
++static av_cold int libvvdec_init(AVCodecContext *avctx)
++{
++    LibvvdecContext *ctx = avctx->priv_data;
++    vvdecParams params;
++
++    vvdec_params_default(&params);
++    params.threads    = avctx->thread_count > 1 ? avctx->thread_count : -1;
++    params.parseDelay = ctx->parse_delay;
++    params.logLevel   = VVDEC_WARNING;
++
++    ctx->decoder = vvdec_decoder_open(&params);
++    if (!ctx->decoder)
++        return AVERROR_EXTERNAL;
++
++    avctx->pix_fmt = AV_PIX_FMT_YUV420P10LE;
++    vvdec_set_logging_callback(ctx->decoder, libvvdec_log);
++
++    return 0;
++}
++
++static av_cold int libvvdec_close(AVCodecContext *avctx)
++{
++    LibvvdecContext *ctx = avctx->priv_data;
++
++    if (ctx->decoder)
++        vvdec_decoder_close(ctx->decoder);
++    ctx->decoder = NULL;
++
++    return 0;
++}
++
++static void libvvdec_flush(AVCodecContext *avctx)
++{
++    LibvvdecContext *ctx = avctx->priv_data;
++    vvdecFrame *frame = NULL;
++
++    if (!ctx->decoder)
++        return;
++
++    while (vvdec_flush(ctx->decoder, &frame) == VVDEC_OK && frame)
++        frame = NULL;
++}
++
++static enum AVPixelFormat vvdec_pixel_format(const vvdecFrame *frame)
++{
++    switch (frame->colorFormat) {
++    case VVDEC_CF_YUV400_PLANAR:
++        if (frame->bitDepth <= 8)
++            return AV_PIX_FMT_GRAY8;
++        if (frame->bitDepth <= 10)
++            return AV_PIX_FMT_GRAY10LE;
++        return AV_PIX_FMT_GRAY12LE;
++    case VVDEC_CF_YUV420_PLANAR:
++        if (frame->bitDepth <= 8)
++            return AV_PIX_FMT_YUV420P;
++        if (frame->bitDepth <= 10)
++            return AV_PIX_FMT_YUV420P10LE;
++        return AV_PIX_FMT_YUV420P12LE;
++    case VVDEC_CF_YUV422_PLANAR:
++        if (frame->bitDepth <= 8)
++            return AV_PIX_FMT_YUV422P;
++        if (frame->bitDepth <= 10)
++            return AV_PIX_FMT_YUV422P10LE;
++        return AV_PIX_FMT_YUV422P12LE;
++    case VVDEC_CF_YUV444_PLANAR:
++        if (frame->bitDepth <= 8)
++            return AV_PIX_FMT_YUV444P;
++        if (frame->bitDepth <= 10)
++            return AV_PIX_FMT_YUV444P10LE;
++        return AV_PIX_FMT_YUV444P12LE;
++    default:
++        return AV_PIX_FMT_NONE;
++    }
++}
++
++static int libvvdec_copy_frame(AVCodecContext *avctx, AVFrame *frame,
++                               const vvdecFrame *src)
++{
++    const AVPixFmtDescriptor *desc;
++    int ret, plane;
++
++    frame->format = vvdec_pixel_format(src);
++    if (frame->format == AV_PIX_FMT_NONE)
++        return AVERROR_INVALIDDATA;
++
++    frame->width  = src->width;
++    frame->height = src->height;
++    frame->pts    = src->cts;
++
++    ret = ff_get_buffer(avctx, frame, 0);
++    if (ret < 0)
++        return ret;
++
++    desc = av_pix_fmt_desc_get(frame->format);
++    if (!desc)
++        return AVERROR_INVALIDDATA;
++
++    for (plane = 0; plane < FFMIN(src->numPlanes, 4); plane++) {
++        const vvdecPlane *src_plane = &src->planes[plane];
++        int h = src_plane->height;
++        ptrdiff_t linesize = FFMIN(src_plane->stride, frame->linesize[plane]);
++
++        for (int y = 0; y < h; y++)
++            memcpy(frame->data[plane] + y * frame->linesize[plane],
++                   src_plane->ptr + y * src_plane->stride, linesize);
++    }
++
++    return 0;
++}
++
++static int libvvdec_decode(AVCodecContext *avctx, AVFrame *frame,
++                           int *got_frame, AVPacket *avpkt)
++{
++    LibvvdecContext *ctx = avctx->priv_data;
++    vvdecAccessUnit au = { 0 };
++    vvdecFrame *vframe = NULL;
++    uint8_t *annexb = NULL;
++    int ret = 0;
++
++    if (avpkt->size) {
++        const uint8_t *data = avpkt->data;
++        int size = avpkt->size;
++        int nal_length_size = 4;
++
++        /* The vvdec library expects Annex-B (start-code) bitstreams. When the
++         * input uses length-prefixed NAL units (e.g. from an mp4 demuxer),
++         * convert them in place first. The vvcC layout does not carry the NAL
++         * length size at a fixed offset, so detect it from the payload: if the
++         * first 4 bytes form a valid 4-byte length or the first 2 bytes form a
++         * valid 2-byte length, use that; otherwise assume Annex-B. */
++        if (size >= 4 && AV_RB32(data) <= size - 4 && AV_RB32(data) > 0)
++            nal_length_size = 4;
++        else if (size >= 2 && AV_RB16(data) <= size - 2 && AV_RB16(data) > 0)
++            nal_length_size = 2;
++        else
++            nal_length_size = 0;
++
++        if (nal_length_size) {
++            annexb = av_malloc(size + size / 2 + 64);
++            if (!annexb)
++                return AVERROR(ENOMEM);
++
++            size = 0;
++            while (avpkt->data + avpkt->size - data >= nal_length_size) {
++                int nalsize = nal_length_size == 4 ? AV_RB32(data) : AV_RB16(data);
++                data += nal_length_size;
++                if (nalsize <= 0 || nalsize > avpkt->data + avpkt->size - data)
++                    break;
++                if (nalsize == 1) {
++                    annexb[size++] = 0;
++                    annexb[size++] = 0;
++                    annexb[size++] = 0;
++                    annexb[size++] = 1;
++                    memcpy(annexb + size, data, nalsize);
++                    size += nalsize;
++                    data += nalsize;
++                    continue;
++                }
++                annexb[size++] = 0;
++                annexb[size++] = 0;
++                annexb[size++] = 0;
++                annexb[size++] = 1;
++                memcpy(annexb + size, data, nalsize);
++                size += nalsize;
++                data += nalsize;
++            }
++            data = annexb;
++        }
++
++        au.payload         = (unsigned char *)data;
++        au.payloadSize     = size;
++        au.payloadUsedSize = size;
++        au.ctsValid = false;
++        au.dtsValid = false;
++        au.rap = avpkt->flags & AV_PKT_FLAG_KEY;
++    }
++
++    if (!avpkt->size) {
++        ret = vvdec_flush(ctx->decoder, &vframe);
++        if (vframe) {
++            ret = libvvdec_copy_frame(avctx, frame, vframe);
++            if (ret < 0)
++                return ret;
++            *got_frame = 1;
++        }
++        return 0;
++    }
++
++    ret = vvdec_decode(ctx->decoder, &au, &vframe);
++    if (ret < 0 && ret != VVDEC_TRY_AGAIN)
++        return AVERROR_EXTERNAL;
++
++    if (vframe) {
++        ret = libvvdec_copy_frame(avctx, frame, vframe);
++        if (ret < 0) {
++            av_free(annexb);
++            return ret;
++        }
++        *got_frame = 1;
++    }
++
++    av_free(annexb);
++    return 0;
++}
++
++static const AVOption libvvdec_options[] = {
++    { "parse_delay", "number of frames to parse in parallel",
++      offsetof(LibvvdecContext, parse_delay), AV_OPT_TYPE_INT,
++      { .i64 = -1 }, -1, INT_MAX, AV_OPT_FLAG_VIDEO_PARAM | AV_OPT_FLAG_DECODING_PARAM },
++    { NULL },
++};
++
++static const AVClass libvvdec_class = {
++    .class_name = "libvvdec decoder",
++    .item_name  = av_default_item_name,
++    .option     = libvvdec_options,
++    .version    = LIBAVUTIL_VERSION_INT,
++};
++
++const FFCodec ff_libvvdec_decoder = {
++    .p.name         = "libvvdec",
++    .p.long_name    = NULL_IF_CONFIG_SMALL("VVC (Versatile Video Coding) via vvdec"),
++    .p.type         = AVMEDIA_TYPE_VIDEO,
++    .p.id           = AV_CODEC_ID_VVC,
++    .priv_data_size = sizeof(LibvvdecContext),
++    .init           = libvvdec_init,
++    .close          = libvvdec_close,
++    FF_CODEC_DECODE_CB(libvvdec_decode),
++    .flush          = libvvdec_flush,
++    .p.capabilities = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_DELAY | AV_CODEC_CAP_OTHER_THREADS,
++    .caps_internal  = FF_CODEC_CAP_AUTO_THREADS,
++    CODEC_PIXFMTS(AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P10LE, AV_PIX_FMT_YUV420P12LE,
++                  AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P10LE, AV_PIX_FMT_YUV422P12LE,
++                  AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P10LE, AV_PIX_FMT_YUV444P12LE),
++    .p.priv_class   = &libvvdec_class,
++    .p.wrapper_name = "libvvdec",
++};
++
+diff --git a/libavcodec/Makefile b/libavcodec/Makefile
+--- a/libavcodec/Makefile
++++ b/libavcodec/Makefile
+@@ -1231,6 +1231,7 @@
+ OBJS-$(CONFIG_LIBVPX_VP8_ENCODER)         += libvpxenc.o
+ OBJS-$(CONFIG_LIBVPX_VP9_DECODER)         += libvpxdec.o
+ OBJS-$(CONFIG_LIBVPX_VP9_ENCODER)         += libvpxenc.o
++OBJS-$(CONFIG_LIBVVDEC_DECODER)           += libvvdecdec.o
+ OBJS-$(CONFIG_LIBVVENC_ENCODER)           += libvvenc.o
+ OBJS-$(CONFIG_LIBWEBP_ENCODER)            += libwebpenc_common.o libwebpenc.o
+ OBJS-$(CONFIG_LIBWEBP_ANIM_ENCODER)       += libwebpenc_common.o libwebpenc_animencoder.o
+diff --git a/libavcodec/allcodecs.c b/libavcodec/allcodecs.c
+--- a/libavcodec/allcodecs.c
++++ b/libavcodec/allcodecs.c
+@@ -382,6 +382,7 @@
+ extern const FFCodec ff_vp9_v4l2m2m_decoder;
+ extern const FFCodec ff_vqa_decoder;
+ extern const FFCodec ff_vqc_decoder;
++extern const FFCodec ff_libvvdec_decoder;
+ extern const FFCodec ff_vvc_decoder;
+ extern const FFCodec ff_wbmp_decoder;
+ extern const FFCodec ff_wbmp_encoder;
+diff --git a/configure b/configure
+--- a/configure
++++ b/configure
+@@ -298,6 +298,7 @@
+   --enable-libvorbis       enable Vorbis en/decoding via libvorbis,
+                            native implementation exists [no]
+   --enable-libvpx          enable VP8 and VP9 de/encoding via libvpx [no]
++  --enable-libvvdec        enable VVC decoding via libvvdec [no]
+   --enable-libvvenc        enable H.266/VVC encoding via vvenc [no]
+   --enable-libwebp         enable WebP encoding via libwebp [no]
+   --enable-libx264         enable H.264 encoding via x264 [no]
+@@ -2111,6 +2112,7 @@
+     libvmaf
+     libvorbis
+     libvpx
++    libvvdec
+     libvvenc
+     libwebp
+     libxevd
+@@ -3873,6 +3875,7 @@
+ libvorbis_encoder_deps="libvorbis libvorbisenc"
+ libvorbis_encoder_select="audio_frame_queue"
+ libvpx_vp8_decoder_deps="libvpx"
++libvvdec_decoder_deps="libvvdec"
+ libvpx_vp8_encoder_deps="libvpx"
+ libvpx_vp9_decoder_deps="libvpx"
+ libvpx_vp9_encoder_deps="libvpx"
+@@ -7475,6 +7478,7 @@
+     fi
+ }
+ 
++enabled libvvdec          && require_pkg_config libvvdec libvvdec "vvdec/vvdec.h" vvdec_decoder_open
+ enabled libvvenc          && require_pkg_config libvvenc "libvvenc >= 1.6.1" "vvenc/vvenc.h" vvenc_get_version
+ enabled libwebp           && {
+     enabled libwebp_encoder      && require_pkg_config libwebp "libwebp >= 0.2.0" webp/encode.h WebPGetEncoderVersion

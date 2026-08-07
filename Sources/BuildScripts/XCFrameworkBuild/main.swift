@@ -24,6 +24,7 @@ do {
     try BuildPlacebo().buildALL()
     try BuildDav1d().buildALL()
     try BuildLcevcDec().buildALL()
+    try BuildVvdec().buildALL()
     try BuildFFMPEG().buildALL()
 
     // mpv
@@ -36,7 +37,7 @@ do {
 }
 
 enum Library: String, CaseIterable {
-    case libmpv, FFmpeg, liblcevc_dec, libshaderc, vulkan, lcms2, libdovi, openssl, libunibreak, libfreetype,
+    case libmpv, FFmpeg, liblcevc_dec, libvvdec, libshaderc, vulkan, lcms2, libdovi, openssl, libunibreak, libfreetype,
         libfribidi, libharfbuzz, libass, libplacebo, libdav1d, libuchardet, libbluray, libluajit, libuavs3d
     var version: String {
         switch self {
@@ -56,6 +57,11 @@ enum Library: String, CaseIterable {
             // LCEVCdec (V-Nova reference MPEG-5 LCEVC decoder). FFmpeg master
             // requires lcevc_dec >= 4.0.0 for --enable-liblcevc-dec.
             return "4.2.0"
+        case .libvvdec:
+            // Fraunhofer vvdec (VVC reference decoder). The libvvdec decoder
+            // in the FFmpeg patch series decodes about 1.5x faster than the
+            // native decoder, which matters for software 4K playback.
+            return "v3.2.0"
         case .libass:
             return "0.18.3"
         case .libunibreak:
@@ -97,6 +103,8 @@ enum Library: String, CaseIterable {
             return "https://github.com/FFmpeg/FFmpeg"
         case .liblcevc_dec:
             return "https://github.com/v-novaltd/LCEVCdec"
+        case .libvvdec:
+            return "https://github.com/fraunhoferhhi/vvdec"
         case .openssl:
             return
                 "https://github.com/mpvkit/openssl-build/releases/download/\(self.version)/openssl-all.zip"
@@ -216,6 +224,15 @@ enum Library: String, CaseIterable {
                     checksum: ""
                 )
             }
+        case .libvvdec:
+            return [
+                .target(
+                    name: "Liblvvdec",
+                    url:
+                        "https://github.com/jonahnm/MPVKit/releases/download/\(BaseBuild.options.releaseVersion)/Liblvvdec.xcframework.zip",
+                    checksum: ""
+                )
+            ]
         case .openssl:
             return [
                 .target(
@@ -536,6 +553,62 @@ private class BuildLcevcDec: BaseBuild {
     }
 }
 
+private class BuildVvdec: BaseBuild {
+    init() {
+        super.init(library: .libvvdec)
+    }
+
+    override func arguments(platform: PlatformType, arch: ArchType) -> [String] {
+        [
+            "-DVVDEC_BUILD_TESTING=OFF",
+            "-DVVDEC_BUILD_APPS=OFF",
+            "-DVVDEC_BUILD_SHARED=OFF",
+        ]
+    }
+
+    override func build(platform: PlatformType, arch: ArchType) throws {
+        // Run the CMake configure/build/install steps directly (mirrors
+        // BaseBuild's cmake branch) so failures surface in the CI log.
+        let buildURL = scratch(platform: platform, arch: arch)
+        try? FileManager.default.createDirectory(at: buildURL, withIntermediateDirectories: true, attributes: nil)
+        let environ = environment(platform: platform, arch: arch)
+        let thinDirPath = thinDir(platform: platform, arch: arch).path
+
+        let cmake = Utility.shell("which cmake", isOutput: true)!
+        var configureArgs = [
+            directoryURL.path,
+            "-DCMAKE_VERBOSE_MAKEFILE=0",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_OSX_SYSROOT=\(platform.sdk.lowercased())",
+            "-DCMAKE_OSX_ARCHITECTURES=\(arch.rawValue)",
+            "-DCMAKE_SYSTEM_NAME=\(platform.cmakeSystemName)",
+            "-DCMAKE_SYSTEM_PROCESSOR=\(arch.rawValue)",
+            "-DCMAKE_INSTALL_PREFIX=\(thinDirPath)",
+            "-DBUILD_SHARED_LIBS=0",
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+        ]
+        configureArgs += arguments(platform: platform, arch: arch)
+        try Utility.launch(path: cmake, arguments: configureArgs, currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ)
+        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ)
+
+        // The vvdec installs libvvdec.a under lib64; mirror the fork's
+        // Lib<Name>.a convention into the thin lib dir for the framework step.
+        let libDir = thinDir(platform: platform, arch: arch) + "lib"
+        let lib64 = thinDir(platform: platform, arch: arch) + "lib64"
+        let source = (lib64 + "libvvdec.a").path
+        let destination = (libDir + "Libvvdec.a").path
+        if FileManager.default.fileExists(atPath: source) {
+            try? FileManager.default.removeItem(atPath: destination)
+            try Utility.launch(path: "/bin/cp", arguments: ["-R", source, destination])
+        }
+    }
+
+    override func frameworks() throws -> [String] {
+        ["Libvvdec"]
+    }
+}
+
 private class BuildFFMPEG: BaseBuild {
     init() {
         super.init(library: .FFmpeg)
@@ -706,6 +779,9 @@ private class BuildFFMPEG: BaseBuild {
                     // The configure option is hyphenated while the Library
                     // case is underscored: --enable-liblcevc-dec.
                     arguments.append("--enable-liblcevc-dec")
+                } else if library == .libvvdec {
+                    arguments.append("--enable-libvvdec")
+                    arguments.append("--enable-decoder=vvc")
                 } else {
                     arguments.append("--enable-\(library.rawValue)")
                 }

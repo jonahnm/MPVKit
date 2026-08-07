@@ -39,7 +39,8 @@ let package = Package(
                 "MoltenVK", "Libshaderc_combined", "lcms2", "Libplacebo", "Libdovi", "Libunibreak",
                 "Libdav1d", "Libuavs3d",
                 "Liblcevc_dec_api", "Liblcevc_dec_api_utility", "Liblcevc_dec_common", "Liblcevc_dec_enhancement",
-                "Liblcevc_dec_extract", "Liblcevc_dec_pipeline", "Liblcevc_dec_pipeline_cpu", "Liblcevc_dec_pixel_processing"
+                "Liblcevc_dec_extract", "Liblcevc_dec_pipeline", "Liblcevc_dec_pipeline_cpu", "Liblcevc_dec_pixel_processing",
+                "Liblvvdec"
             ],
             path: "Sources/_FFmpeg",
             linkerSettings: [
@@ -190,6 +191,12 @@ let package = Package(
             name: "Liblcevc_dec_pixel_processing",
             url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_pixel_processing.xcframework.zip",
             checksum: "1c7244ce111c1409b14c61716a1aec7a9e51485a4479cc50a617f93300d6aec8"
+        ),
+
+        .binaryTarget(
+            name: "Liblvvdec",
+            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblvvdec.xcframework.zip",
+            checksum: ""
         ),
 
         .binaryTarget(
