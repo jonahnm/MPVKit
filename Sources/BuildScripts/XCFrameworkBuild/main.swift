@@ -148,6 +148,8 @@ enum Library: String, CaseIterable {
     // for generate Package.swift
     var targets: [PackageTarget] {
         switch self {
+        case .libvvdec:
+            return []
         case .libmpv:
             return [
                 .target(
