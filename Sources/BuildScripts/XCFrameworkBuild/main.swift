@@ -627,6 +627,7 @@ private class BuildFFMPEG: BaseBuild {
         {
             let mergedLib = prefix + "lib/libavcodec_merged.a"
             try Utility.launch(path: "/usr/bin/libtool", arguments: ["-static", "-o", mergedLib.path, avcodecLib.path, vvdecLib.path])
+            try Utility.launch(path: "/usr/bin/ranlib", arguments: [mergedLib.path])
             try? FileManager.default.removeItem(at: avcodecLib)
             try FileManager.default.moveItem(at: mergedLib, to: avcodecLib)
         }
