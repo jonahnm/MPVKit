@@ -23,7 +23,6 @@ do {
     try BuildLittleCms().buildALL()
     try BuildPlacebo().buildALL()
     try BuildDav1d().buildALL()
-    try BuildLcevcDec().buildALL()
     try BuildVvdec().buildALL()
     try BuildFFMPEG().buildALL()
 
@@ -37,26 +36,19 @@ do {
 }
 
 enum Library: String, CaseIterable {
-    case libmpv, FFmpeg, liblcevc_dec, libvvdec, libshaderc, vulkan, lcms2, libdovi, openssl, libunibreak, libfreetype,
+    case libmpv, FFmpeg, libvvdec, libshaderc, vulkan, lcms2, libdovi, openssl, libunibreak, libfreetype,
         libfribidi, libharfbuzz, libass, libplacebo, libdav1d, libuchardet, libbluray, libluajit, libuavs3d
     var version: String {
         switch self {
         case .libmpv:
             return "v0.41.0"
         case .FFmpeg:
-            // Track master for LCEVC (MPEG-5) enhancement-layer decoding.
-            // liblcevc-dec and the native cbs_lcevc/lcevc_metadata support
-            // only exist on master; the n8.1.x branch has no LCEVC decoder.
             // The fork patch series is rebased onto a known master snapshot
             // (9862dd8); if a master move breaks the patch series the build
             // fails loudly and the patches must be rebased again.
             return "master"
         case .openssl:
             return "3.3.5"
-        case .liblcevc_dec:
-            // LCEVCdec (V-Nova reference MPEG-5 LCEVC decoder). FFmpeg master
-            // requires lcevc_dec >= 4.0.0 for --enable-liblcevc-dec.
-            return "4.2.0"
         case .libvvdec:
             // Fraunhofer vvdec (VVC reference decoder). The libvvdec decoder
             // in the FFmpeg patch series decodes about 1.5x faster than the
@@ -101,8 +93,6 @@ enum Library: String, CaseIterable {
             return "https://github.com/mpv-player/mpv"
         case .FFmpeg:
             return "https://github.com/FFmpeg/FFmpeg"
-        case .liblcevc_dec:
-            return "https://github.com/v-novaltd/LCEVCdec"
         case .libvvdec:
             return "https://github.com/fraunhoferhhi/vvdec"
         case .openssl:
@@ -212,18 +202,6 @@ enum Library: String, CaseIterable {
                     checksum: ""
                 ),
             ]
-        case .liblcevc_dec:
-            // One binary target per SDK component; the frameworks ship from
-            // the release tarball like the FFmpeg frameworks.
-            return ["api", "api_utility", "common", "enhancement", "extract",
-                    "pipeline", "pipeline_cpu", "pixel_processing"].map {
-                .target(
-                    name: "Liblcevc_dec_\($0)",
-                    url:
-                        "https://github.com/jonahnm/MPVKit/releases/download/\(BaseBuild.options.releaseVersion)/Liblcevc_dec_\($0).xcframework.zip",
-                    checksum: ""
-                )
-            }
         case .libvvdec:
             return [
                 .target(
@@ -475,84 +453,6 @@ private class BuildMPV: BaseBuild {
 
 }
 
-private class BuildLcevcDec: BaseBuild {
-    init() {
-        super.init(library: .liblcevc_dec)
-    }
-
-    override func arguments(platform: PlatformType, arch: ArchType) -> [String] {
-        [
-            "-DVN_SDK_EXECUTABLES=OFF",
-            "-DVN_SDK_UNIT_TESTS=OFF",
-            "-DVN_SDK_DOCS=OFF",
-            "-DVN_SDK_SYSTEM_INSTALL=OFF",
-        ]
-    }
-
-    override func build(platform: PlatformType, arch: ArchType) throws {
-        // Run the CMake configure/build/install steps directly (mirrors
-        // BaseBuild's cmake branch) so failures surface in the CI log.
-        let buildURL = scratch(platform: platform, arch: arch)
-        try? FileManager.default.createDirectory(at: buildURL, withIntermediateDirectories: true, attributes: nil)
-        let environ = environment(platform: platform, arch: arch)
-        let thinDirPath = thinDir(platform: platform, arch: arch).path
-
-        let cmake = Utility.shell("which cmake", isOutput: true)!
-        var configureArgs = [
-            directoryURL.path,
-            "-DCMAKE_VERBOSE_MAKEFILE=0",
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DCMAKE_OSX_SYSROOT=\(platform.sdk.lowercased())",
-            "-DCMAKE_OSX_ARCHITECTURES=\(arch.rawValue)",
-            "-DCMAKE_SYSTEM_NAME=\(platform.cmakeSystemName)",
-            "-DCMAKE_SYSTEM_PROCESSOR=\(arch.rawValue)",
-            "-DCMAKE_INSTALL_PREFIX=\(thinDirPath)",
-            "-DBUILD_SHARED_LIBS=0",
-            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
-        ]
-        configureArgs += arguments(platform: platform, arch: arch)
-        try Utility.launch(path: cmake, arguments: configureArgs, currentDirectoryURL: buildURL, environment: environ)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8"], currentDirectoryURL: buildURL, environment: environ)
-        try Utility.launch(path: "/usr/bin/make", arguments: ["-j8", "install"], currentDirectoryURL: buildURL, environment: environ)
-
-        // LCEVCdec installs one archive per component (liblcevc_dec_api.a,
-        // liblcevc_dec_common.a, ...). The framework step lips one archive per
-        // framework, so mirror the fork's Lib<Name>.a convention for each
-        // component while keeping the originals for the lcevc_dec pkg-config
-        // that FFmpeg's configure consumes. The archives are copied from the
-        // scratch lib dir the install read them from.
-        let libDir = thinDir(platform: platform, arch: arch) + "lib"
-        let components = (try? FileManager.default.contentsOfDirectory(atPath: libDir.path))?
-            .filter { $0.hasPrefix("liblcevc_dec_") && $0.hasSuffix(".a") }
-            .sorted() ?? []
-        for name in components {
-            let capitalized = "Lib" + name.dropFirst(3)
-            let scratchSource = (buildURL + ["lib", name]).path
-            let destination = (libDir + capitalized).path
-            try? FileManager.default.removeItem(atPath: destination)
-            try Utility.launch(path: "/bin/cp", arguments: ["-R", scratchSource, destination])
-        }
-    }
-
-    override func frameworks() throws -> [String] {
-        // One framework per LCEVCdec component archive so libavcodec's
-        // LCEVC symbol references resolve at app link time.
-        var frameworks: [String] = []
-        if let platform = platforms().first {
-            if let arch = platform.architectures.first {
-                let lib = thinDir(platform: platform, arch: arch) + "lib"
-                let fileNames = try FileManager.default.contentsOfDirectory(atPath: lib.path)
-                for fileName in fileNames {
-                    if fileName.hasPrefix("Liblcevc_dec_"), fileName.hasSuffix(".a") {
-                        frameworks.append(fileName.dropLast(2).description)
-                    }
-                }
-            }
-        }
-        return frameworks.sorted()
-    }
-}
-
 private class BuildVvdec: BaseBuild {
     init() {
         super.init(library: .libvvdec)
@@ -636,9 +536,8 @@ private class BuildFFMPEG: BaseBuild {
     }
 
     override func flagsDependencelibrarys() -> [Library] {
-        // liblcevc_dec is intentionally absent: FFmpeg's configure resolves
-        // it through the lcevc_dec pkg-config (picked up by PKG_CONFIG_LIBDIR),
-        // and the generic -llcevc_dec link flag has no matching archive.
+        // libvvdec is resolved by FFmpeg's configure through the libvvdec
+        // pkg-config (picked up by PKG_CONFIG_LIBDIR).
         [.libdovi]
     }
 
@@ -765,7 +664,7 @@ private class BuildFFMPEG: BaseBuild {
         let dependencyLibrary = [
             Library.libfreetype, .libharfbuzz, .libfribidi, .libass, .vulkan,
             .libshaderc, .lcms2, .libplacebo, .libdav1d, .libuavs3d, .openssl,
-            .liblcevc_dec,
+            .libvvdec,
         ]
         for library in dependencyLibrary {
             // FFmpeg master dropped the --enable-libshaderc configure option.
@@ -775,11 +674,7 @@ private class BuildFFMPEG: BaseBuild {
             let path =
                 URL.currentDirectory + [library.rawValue, platform.rawValue, "thin", arch.rawValue]
             if FileManager.default.fileExists(atPath: path.path) {
-                if library == .liblcevc_dec {
-                    // The configure option is hyphenated while the Library
-                    // case is underscored: --enable-liblcevc-dec.
-                    arguments.append("--enable-liblcevc-dec")
-                } else if library == .libvvdec {
+                if library == .libvvdec {
                     arguments.append("--enable-libvvdec")
                     arguments.append("--enable-decoder=vvc")
                 } else {
@@ -792,8 +687,6 @@ private class BuildFFMPEG: BaseBuild {
                     arguments.append("--enable-filter=subtitles")
                 } else if library == .libplacebo {
                     arguments.append("--enable-filter=libplacebo")
-                } else if library == .liblcevc_dec {
-                    arguments.append("--enable-filter=lcevc")
                 }
             }
         }
@@ -858,9 +751,7 @@ private class BuildFFMPEG: BaseBuild {
         "--enable-demuxers",
         // ./configure --list-bsfs
         "--enable-bsfs",
-        // LCEVC enhancement-layer bitstream filters, enabled explicitly so
-        // they survive any --enable-bsfs component-list changes on master.
-        "--enable-bsf=lcevc_merge,lcevc_metadata",
+
         // ./configure --list-decoders
         "--enable-decoders",
 

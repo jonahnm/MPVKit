@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..1111111
 --- /dev/null
 +++ b/libavcodec/libvvdecdec.c
-@@ -0,0 +1,287 @@
+@@ -0,0 +1,291 @@
 +/*
 + * VVC (Versatile Video Coding) decoder using the Fraunhofer vvdec library
 + *
@@ -180,14 +180,18 @@ index 0000000..1111111
 +        /* The vvdec library expects Annex-B (start-code) bitstreams. When the
 +         * input uses length-prefixed NAL units (e.g. from an mp4 demuxer),
 +         * convert them in place first. The vvcC layout does not carry the NAL
-+         * length size at a fixed offset, so detect it from the payload: if the
-+         * first 4 bytes form a valid 4-byte length or the first 2 bytes form a
-+         * valid 2-byte length, use that; otherwise assume Annex-B. */
-+        if (size >= 4 && AV_RB32(data) <= size - 4 && AV_RB32(data) > 0)
-+            nal_length_size = 4;
-+        else if (size >= 2 && AV_RB16(data) <= size - 2 && AV_RB16(data) > 0)
-+            nal_length_size = 2;
-+        else
++         * length size at a fixed offset, so detect it from the payload: an
++         * Annex-B access unit starts with a 0x00000001 start code, anything
++         * else is treated as length-prefixed (4-byte, or 2-byte if the first
++         * 2 bytes form a valid length). */
++        if (size >= 4 && AV_RB32(data) != 1) {
++            if (size >= 4 && AV_RB32(data) <= size - 4 && AV_RB32(data) > 0)
++                nal_length_size = 4;
++            else if (size >= 2 && AV_RB16(data) <= size - 2 && AV_RB16(data) > 0)
++                nal_length_size = 2;
++            else
++                nal_length_size = 4;
++        } else
 +            nal_length_size = 0;
 +
 +        if (nal_length_size) {

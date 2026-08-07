@@ -38,8 +38,6 @@ let package = Package(
                 "Libssl", "Libcrypto", "Libass", "Libfreetype", "Libfribidi", "Libharfbuzz",
                 "MoltenVK", "Libshaderc_combined", "lcms2", "Libplacebo", "Libdovi", "Libunibreak",
                 "Libdav1d", "Libuavs3d",
-                "Liblcevc_dec_api", "Liblcevc_dec_api_utility", "Liblcevc_dec_common", "Liblcevc_dec_enhancement",
-                "Liblcevc_dec_extract", "Liblcevc_dec_pipeline", "Liblcevc_dec_pipeline_cpu", "Liblcevc_dec_pixel_processing",
                 "Liblvvdec"
             ],
             path: "Sources/_FFmpeg",
@@ -152,46 +150,6 @@ let package = Package(
             checksum: "7965ecf274af5448fa830bc1fec4e78257cf1d7509ed1cd95e32023b7bdff965"
         ),
 
-        .binaryTarget(
-            name: "Liblcevc_dec_api",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_api.xcframework.zip",
-            checksum: "027686f17aad3cd1bc9ec44b9606f88203b98f51537689641baee8f253b86b41"
-        ),
-        .binaryTarget(
-            name: "Liblcevc_dec_api_utility",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_api_utility.xcframework.zip",
-            checksum: "6e4f37aca7b0ea4375cf21d10ebd4e410279592b41765c7edaf71b6aafdf8752"
-        ),
-        .binaryTarget(
-            name: "Liblcevc_dec_common",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_common.xcframework.zip",
-            checksum: "534069b17c025bd3774ba5ca2120b80cf3e78c79e1d539533b45b1b8e21c9dc4"
-        ),
-        .binaryTarget(
-            name: "Liblcevc_dec_enhancement",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_enhancement.xcframework.zip",
-            checksum: "7565dc7b51ad34e6eee309aca1e7e9e1616c195c5d19ae5404e13ba3f140a3a6"
-        ),
-        .binaryTarget(
-            name: "Liblcevc_dec_extract",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_extract.xcframework.zip",
-            checksum: "a1a98322838e351921ca6b1778c99ea416eeaec328db7e6dc3c7aa395986f654"
-        ),
-        .binaryTarget(
-            name: "Liblcevc_dec_pipeline",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_pipeline.xcframework.zip",
-            checksum: "227b9844b4ce298c8a4c69d7ee5f0f9a7bcd6408f9fbc25eb927a2e10ea711f8"
-        ),
-        .binaryTarget(
-            name: "Liblcevc_dec_pipeline_cpu",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_pipeline_cpu.xcframework.zip",
-            checksum: "6ae76a9051e583feaaec53f15d910d510a184a90b25a39ce85636d688aa749ee"
-        ),
-        .binaryTarget(
-            name: "Liblcevc_dec_pixel_processing",
-            url: "https://github.com/jonahnm/MPVKit/releases/download/v1.0.22/Liblcevc_dec_pixel_processing.xcframework.zip",
-            checksum: "1c7244ce111c1409b14c61716a1aec7a9e51485a4479cc50a617f93300d6aec8"
-        ),
 
         .binaryTarget(
             name: "Liblvvdec",
