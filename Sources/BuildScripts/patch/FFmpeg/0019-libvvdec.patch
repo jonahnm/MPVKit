@@ -1,9 +1,7 @@
-diff --git a/libavcodec/libvvdecdec.c b/libavcodec/libvvdecdec.c
-new file mode 100644
-index 0000000..1111111
---- /dev/null
-+++ b/libavcodec/libvvdecdec.c
-@@ -0,0 +1,291 @@
+diff -ruN patchwork/ffmpeg2/ffmpeg/libavcodec/libvvdecdec.c patchwork/ffmpeg/libavcodec/libvvdecdec.c
+--- patchwork/ffmpeg2/ffmpeg/libavcodec/libvvdecdec.c	1969-12-31 19:00:00.000000000 -0500
++++ patchwork/ffmpeg/libavcodec/libvvdecdec.c	2026-08-07 19:24:13.312513485 -0400
+@@ -0,0 +1,320 @@
 +/*
 + * VVC (Versatile Video Coding) decoder using the Fraunhofer vvdec library
 + *
@@ -50,7 +48,10 @@ index 0000000..1111111
 +static void libvvdec_log(void *opaque, int level, const char *msg, va_list args)
 +{
 +    AVCodecContext *avctx = opaque;
-+    av_vlog(avctx, AV_LOG_WARNING, msg, args);
++
++    /* The vvdec library consumes the va_list before invoking the callback,
++     * so the arguments are not usable here; log the message as-is. */
++    av_log(avctx, AV_LOG_WARNING, "libvvdec: %s", msg);
 +}
 +
 +static av_cold int libvvdec_init(AVCodecContext *avctx)
@@ -169,34 +170,40 @@ index 0000000..1111111
 +    LibvvdecContext *ctx = avctx->priv_data;
 +    vvdecAccessUnit au = { 0 };
 +    vvdecFrame *vframe = NULL;
-+    uint8_t *annexb = NULL;
++    uint8_t *converted = NULL;
 +    int ret = 0;
 +
 +    if (avpkt->size) {
 +        const uint8_t *data = avpkt->data;
 +        int size = avpkt->size;
-+        int nal_length_size = 4;
 +
-+        /* The vvdec library expects Annex-B (start-code) bitstreams. When the
-+         * input uses length-prefixed NAL units (e.g. from an mp4 demuxer),
-+         * convert them in place first. The vvcC layout does not carry the NAL
-+         * length size at a fixed offset, so detect it from the payload: an
-+         * Annex-B access unit starts with a 0x00000001 start code, anything
-+         * else is treated as length-prefixed (4-byte, or 2-byte if the first
-+         * 2 bytes form a valid length). */
-+        if (size >= 4 && AV_RB32(data) != 1) {
++        /* Annex-B (start-code) detection: accept both 3-byte and 4-byte
++         * start codes. A leading 0x00000001 is ambiguous (it could be a
++         * length prefix of 1), so require a second start code further in
++         * before treating the packet as Annex-B. */
++        int annexb = 0;
++        if (size >= 4 && AV_RB32(data) == 1) {
++            /* 0x00000001: 4-byte start code or a length prefix of 1. Treat
++             * it as a start code when a second start code follows. */
++            if ((size >= 8 && AV_RB32(data + 4) == 1) ||
++                (size >= 7 && AV_RB24(data + 4) == 1))
++                annexb = 1;
++        } else if (size >= 3 && AV_RB24(data) == 1 &&
++                   !(size >= 4 && AV_RB32(data) <= size - 4 && AV_RB32(data) > 0)) {
++            /* 3-byte start code, unless the first 4 bytes are a plausible
++             * length prefix (e.g. 0x00000100 with a 256-byte NAL). */
++            annexb = 1;
++        }
++
++        if (!annexb) {
++            int nal_length_size = 4;
 +            if (size >= 4 && AV_RB32(data) <= size - 4 && AV_RB32(data) > 0)
 +                nal_length_size = 4;
 +            else if (size >= 2 && AV_RB16(data) <= size - 2 && AV_RB16(data) > 0)
 +                nal_length_size = 2;
-+            else
-+                nal_length_size = 4;
-+        } else
-+            nal_length_size = 0;
 +
-+        if (nal_length_size) {
-+            annexb = av_malloc(size + size / 2 + 64);
-+            if (!annexb)
++            converted = av_malloc(size + size / 2 + 64);
++            if (!converted)
 +                return AVERROR(ENOMEM);
 +
 +            size = 0;
@@ -205,25 +212,46 @@ index 0000000..1111111
 +                data += nal_length_size;
 +                if (nalsize <= 0 || nalsize > avpkt->data + avpkt->size - data)
 +                    break;
-+                if (nalsize == 1) {
-+                    annexb[size++] = 0;
-+                    annexb[size++] = 0;
-+                    annexb[size++] = 0;
-+                    annexb[size++] = 1;
-+                    memcpy(annexb + size, data, nalsize);
++                /* Skip enhancement-layer NALs (nuh_layer_id != 0): vvdec
++                 * rejects non-base-layer VCL NALs (IRAP with TemporalId != 0
++                 * is a conformance violation). */
++                if (nalsize >= 2 && ((data[0] & 0x3f) != 0))
++                    ;
++                else {
++                    converted[size++] = 0;
++                    converted[size++] = 0;
++                    converted[size++] = 0;
++                    converted[size++] = 1;
++                    memcpy(converted + size, data, nalsize);
 +                    size += nalsize;
-+                    data += nalsize;
-+                    continue;
 +                }
-+                annexb[size++] = 0;
-+                annexb[size++] = 0;
-+                annexb[size++] = 0;
-+                annexb[size++] = 1;
-+                memcpy(annexb + size, data, nalsize);
-+                size += nalsize;
 +                data += nalsize;
 +            }
-+            data = annexb;
++            data = converted;
++        }
++
++        /* An access unit must contain at most one coded picture; vvdec
++         * rejects AUs that carry a small trailing VCL NAL after the picture
++         * (seen with the length-prefixed mp4 remuxes). Drop such NALs. */
++        {
++            int last_off = 0;
++            for (int i = 0; i + 3 < size; i++) {
++                if (data[i] == 0 && data[i + 1] == 0 && data[i + 2] == 1 &&
++                    (i == 0 || data[i - 1] != 0))
++                    last_off = i;
++            }
++            if (last_off > 0) {
++                int nalsize = size - last_off;
++                int hdr = last_off + ((data[last_off + 2] == 1) ? 3 : 4);
++                if (nalsize >= hdr + 1 && nalsize - hdr < 256 &&
++                    ((data[hdr + 1] >> 3) & 0x1f) <= 23)
++                    size = last_off;
++            }
++        }
++
++        if (size == 0) {
++            av_free(converted);
++            return 0;
 +        }
 +
 +        au.payload         = (unsigned char *)data;
@@ -252,13 +280,13 @@ index 0000000..1111111
 +    if (vframe) {
 +        ret = libvvdec_copy_frame(avctx, frame, vframe);
 +        if (ret < 0) {
-+            av_free(annexb);
++            av_free(converted);
 +            return ret;
 +        }
 +        *got_frame = 1;
 +    }
 +
-+    av_free(annexb);
++    av_free(converted);
 +    return 0;
 +}
 +
@@ -294,61 +322,3 @@ index 0000000..1111111
 +    .p.priv_class   = &libvvdec_class,
 +    .p.wrapper_name = "libvvdec",
 +};
-+
-diff --git a/libavcodec/Makefile b/libavcodec/Makefile
---- a/libavcodec/Makefile
-+++ b/libavcodec/Makefile
-@@ -1231,6 +1231,7 @@
- OBJS-$(CONFIG_LIBVPX_VP8_ENCODER)         += libvpxenc.o
- OBJS-$(CONFIG_LIBVPX_VP9_DECODER)         += libvpxdec.o
- OBJS-$(CONFIG_LIBVPX_VP9_ENCODER)         += libvpxenc.o
-+OBJS-$(CONFIG_LIBVVDEC_DECODER)           += libvvdecdec.o
- OBJS-$(CONFIG_LIBVVENC_ENCODER)           += libvvenc.o
- OBJS-$(CONFIG_LIBWEBP_ENCODER)            += libwebpenc_common.o libwebpenc.o
- OBJS-$(CONFIG_LIBWEBP_ANIM_ENCODER)       += libwebpenc_common.o libwebpenc_animencoder.o
-diff --git a/libavcodec/allcodecs.c b/libavcodec/allcodecs.c
---- a/libavcodec/allcodecs.c
-+++ b/libavcodec/allcodecs.c
-@@ -382,6 +382,7 @@
- extern const FFCodec ff_vp9_v4l2m2m_decoder;
- extern const FFCodec ff_vqa_decoder;
- extern const FFCodec ff_vqc_decoder;
-+extern const FFCodec ff_libvvdec_decoder;
- extern const FFCodec ff_vvc_decoder;
- extern const FFCodec ff_wbmp_decoder;
- extern const FFCodec ff_wbmp_encoder;
-diff --git a/configure b/configure
---- a/configure
-+++ b/configure
-@@ -298,6 +298,7 @@
-   --enable-libvorbis       enable Vorbis en/decoding via libvorbis,
-                            native implementation exists [no]
-   --enable-libvpx          enable VP8 and VP9 de/encoding via libvpx [no]
-+  --enable-libvvdec        enable VVC decoding via libvvdec [no]
-   --enable-libvvenc        enable H.266/VVC encoding via vvenc [no]
-   --enable-libwebp         enable WebP encoding via libwebp [no]
-   --enable-libx264         enable H.264 encoding via x264 [no]
-@@ -2111,6 +2112,7 @@
-     libvmaf
-     libvorbis
-     libvpx
-+    libvvdec
-     libvvenc
-     libwebp
-     libxevd
-@@ -3873,6 +3875,7 @@
- libvorbis_encoder_deps="libvorbis libvorbisenc"
- libvorbis_encoder_select="audio_frame_queue"
- libvpx_vp8_decoder_deps="libvpx"
-+libvvdec_decoder_deps="libvvdec"
- libvpx_vp8_encoder_deps="libvpx"
- libvpx_vp9_decoder_deps="libvpx"
- libvpx_vp9_encoder_deps="libvpx"
-@@ -7475,6 +7478,7 @@
-     fi
- }
- 
-+enabled libvvdec          && require_pkg_config libvvdec libvvdec "vvdec/vvdec.h" vvdec_decoder_open
- enabled libvvenc          && require_pkg_config libvvenc "libvvenc >= 1.6.1" "vvenc/vvenc.h" vvenc_get_version
- enabled libwebp           && {
-     enabled libwebp_encoder      && require_pkg_config libwebp "libwebp >= 0.2.0" webp/encode.h WebPGetEncoderVersion
