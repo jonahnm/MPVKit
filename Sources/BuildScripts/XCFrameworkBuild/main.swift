@@ -631,7 +631,7 @@ private class BuildFFMPEG: BaseBuild {
         for slice in slices where !slice.hasPrefix(".") && slice != "Info.plist" {
             let frameworkDir = xcfDir + [slice, "Libavcodec.framework"]
             guard FileManager.default.fileExists(atPath: frameworkDir.path) else { continue }
-            let arch: ArchType = slice.contains("arm64e") ? .arm64e : (slice.contains("x86_64") ? .x86_64 : .arm64)
+            let arch: ArchType = (slice.contains("x86_64") && !slice.contains("arm64")) ? .x86_64 : .arm64
             for platform in platforms() where slice.hasPrefix(platform.rawValue) {
                 let vvdecLib = thinDir(library: .libvvdec, platform: platform, arch: arch) + "lib/libvvdec.a"
                 if FileManager.default.fileExists(atPath: vvdecLib.path) {
