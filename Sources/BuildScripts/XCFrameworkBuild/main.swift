@@ -617,20 +617,6 @@ private class BuildFFMPEG: BaseBuild {
             try str.write(toFile: internalPath.path, atomically: true, encoding: .utf8)
         }
 
-        // Merge the static vvdec archive into libavcodec so the app's final
-        // link can resolve the vvdec symbols without a separate Libvvdec
-        // artifact.
-        let vvdecLib = thinDir(library: .libvvdec, platform: platform, arch: arch) + "lib/libvvdec.a"
-        let avcodecLib = prefix + "lib/libavcodec.a"
-        if FileManager.default.fileExists(atPath: vvdecLib.path),
-            FileManager.default.fileExists(atPath: avcodecLib.path)
-        {
-            let mergedLib = prefix + "lib/libavcodec_merged.a"
-            try Utility.launch(path: "/usr/bin/libtool", arguments: ["-static", "-o", mergedLib.path, avcodecLib.path, vvdecLib.path])
-            try? FileManager.default.removeItem(at: avcodecLib)
-            try FileManager.default.moveItem(at: mergedLib, to: avcodecLib)
-        }
-
     }
 
     override func arguments(platform: PlatformType, arch: ArchType) -> [String] {
