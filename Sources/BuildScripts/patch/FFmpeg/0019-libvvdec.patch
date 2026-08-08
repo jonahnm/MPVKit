@@ -112,10 +112,10 @@ index 2d7496a20d..4878c0db27 100644
  extern const FFCodec ff_wbmp_encoder;
 diff --git a/libavcodec/libvvdecdec.c b/libavcodec/libvvdecdec.c
 new file mode 100644
-index 0000000000..edd4deee17
+index 0000000000..ac591c0b36
 --- /dev/null
 +++ b/libavcodec/libvvdecdec.c
-@@ -0,0 +1,320 @@
+@@ -0,0 +1,324 @@
 +/*
 + * VVC (Versatile Video Coding) decoder using the Fraunhofer vvdec library
 + *
@@ -161,11 +161,10 @@ index 0000000000..edd4deee17
 +
 +static void libvvdec_log(void *opaque, int level, const char *msg, va_list args)
 +{
-+    AVCodecContext *avctx = opaque;
-+
-+    /* The vvdec library consumes the va_list before invoking the callback,
-+     * so the arguments are not usable here; log the message as-is. */
-+    av_log(avctx, AV_LOG_WARNING, "libvvdec: %s", msg);
++    /* The va_list handed to this callback is not usable from C (the vvdec
++     * library passes it through a std::function, which mangles the aarch64
++     * __va_list). Never dereference it; vvdec logs diagnostics to stderr
++     * on its own when no callback is installed, so keep this a no-op. */
 +}
 +
 +static av_cold int libvvdec_init(AVCodecContext *avctx)
@@ -298,9 +297,14 @@ index 0000000000..edd4deee17
 +        int annexb = 0;
 +        if (size >= 4 && AV_RB32(data) == 1) {
 +            /* 0x00000001: 4-byte start code or a length prefix of 1. Treat
-+             * it as a start code when a second start code follows. */
++             * it as a start code when a second start code follows, or when
++             * the length-prefix interpretation is invalid (the following
++             * 4 bytes are not a plausible NAL length). */
 +            if ((size >= 8 && AV_RB32(data + 4) == 1) ||
 +                (size >= 7 && AV_RB24(data + 4) == 1))
++                annexb = 1;
++            else if (size < 8 || AV_RB32(data + 4) == 0 ||
++                     AV_RB32(data + 4) > size - 8)
 +                annexb = 1;
 +        } else if (size >= 3 && AV_RB24(data) == 1 &&
 +                   !(size >= 4 && AV_RB32(data) <= size - 4 && AV_RB32(data) > 0)) {
