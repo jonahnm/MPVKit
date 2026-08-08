@@ -112,10 +112,10 @@ index 2d7496a20d..4878c0db27 100644
  extern const FFCodec ff_wbmp_encoder;
 diff --git a/libavcodec/libvvdecdec.c b/libavcodec/libvvdecdec.c
 new file mode 100644
-index 0000000000..b8f78928e5
+index 0000000000..c9edc57b96
 --- /dev/null
 +++ b/libavcodec/libvvdecdec.c
-@@ -0,0 +1,389 @@
+@@ -0,0 +1,405 @@
 +/*
 + * VVC (Versatile Video Coding) decoder using the Fraunhofer vvdec library
 + *
@@ -162,6 +162,7 @@ index 0000000000..b8f78928e5
 +    uint8_t *pending_buf;
 +    int pending_size;
 +    int pending_off;
++    uint8_t flush_buf[4];
 +} LibvvdecContext;
 +
 +static void libvvdec_log(void *opaque, int level, const char *msg, va_list args)
@@ -206,6 +207,7 @@ index 0000000000..b8f78928e5
 +static void libvvdec_flush(AVCodecContext *avctx)
 +{
 +    LibvvdecContext *ctx = avctx->priv_data;
++    vvdecAccessUnit au = { 0 };
 +    vvdecFrame *frame = NULL;
 +
 +    if (!ctx->decoder)
@@ -215,7 +217,15 @@ index 0000000000..b8f78928e5
 +    ctx->pending_size = 0;
 +    ctx->pending_off = 0;
 +
-+    while (vvdec_flush(ctx->decoder, &frame) == VVDEC_OK && frame)
++    /* vvdec delivers frames held by the reorder buffer only when an access
++     * unit with an empty payload is decoded (vvdecapp's EOF flush). Use an
++     * empty AU instead of vvdec_flush so those frames are produced; they
++     * are discarded here (the decoder wrapper delivers them at stream end
++     * through the null-packet decode path). */
++    au.payload = (unsigned char *)ctx->flush_buf;
++    au.payloadSize = sizeof(ctx->flush_buf);
++    au.payloadUsedSize = 0;
++    while (vvdec_decode(ctx->decoder, &au, &frame) == VVDEC_EOF && frame)
 +        frame = NULL;
 +}
 +
@@ -461,7 +471,13 @@ index 0000000000..b8f78928e5
 +    }
 +
 +    if (!avpkt->size) {
-+        ret = vvdec_flush(ctx->decoder, &vframe);
++        /* Flush: vvdec hands out frames held by the reorder buffer when an
++         * empty access unit is decoded (same as vvdecapp's EOF flush). */
++        vvdecAccessUnit fau = { 0 };
++        fau.payload = ctx->flush_buf;
++        fau.payloadSize = sizeof(ctx->flush_buf);
++        fau.payloadUsedSize = 0;
++        ret = vvdec_decode(ctx->decoder, &fau, &vframe);
 +        if (vframe) {
 +            ret = libvvdec_copy_frame(avctx, frame, vframe);
 +            if (ret < 0)
