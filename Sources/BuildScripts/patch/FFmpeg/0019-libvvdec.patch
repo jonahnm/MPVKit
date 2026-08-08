@@ -112,10 +112,10 @@ index 2d7496a20d..4878c0db27 100644
  extern const FFCodec ff_wbmp_encoder;
 diff --git a/libavcodec/libvvdecdec.c b/libavcodec/libvvdecdec.c
 new file mode 100644
-index 0000000000..c9edc57b96
+index 0000000000..e82e073141
 --- /dev/null
 +++ b/libavcodec/libvvdecdec.c
-@@ -0,0 +1,405 @@
+@@ -0,0 +1,410 @@
 +/*
 + * VVC (Versatile Video Coding) decoder using the Fraunhofer vvdec library
 + *
@@ -182,6 +182,10 @@ index 0000000000..c9edc57b96
 +    params.threads    = avctx->thread_count > 1 ? avctx->thread_count : -1;
 +    params.parseDelay = ctx->parse_delay;
 +    params.logLevel   = VVDEC_WARNING;
++    if (params.threads < 0 || params.threads > 4)
++        params.threads = 4;
++    if (params.parseDelay < 0 || params.parseDelay > 1)
++        params.parseDelay = 1;
 +
 +    ctx->decoder = vvdec_decoder_open(&params);
 +    if (!ctx->decoder)
@@ -445,7 +449,8 @@ index 0000000000..c9edc57b96
 +        ctx->pending_off = next;
 +
 +        ret = vvdec_decode(ctx->decoder, &au, &vframe);
-+        if (ret < 0 && ret != VVDEC_TRY_AGAIN) {
++        if (ret < 0 && ret != VVDEC_TRY_AGAIN && ret != VVDEC_ERR_DEC_INPUT &&
++            ret != VVDEC_ERR_RESTART_REQUIRED) {
 +            av_free(ctx->pending_buf);
 +            ctx->pending_buf = NULL;
 +            ctx->pending_off = ctx->pending_size;
