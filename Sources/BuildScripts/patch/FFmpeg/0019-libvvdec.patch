@@ -112,10 +112,10 @@ index 2d7496a20d..4878c0db27 100644
  extern const FFCodec ff_wbmp_encoder;
 diff --git a/libavcodec/libvvdecdec.c b/libavcodec/libvvdecdec.c
 new file mode 100644
-index 0000000000..e82e073141
+index 0000000000..77f6c4caa3
 --- /dev/null
 +++ b/libavcodec/libvvdecdec.c
-@@ -0,0 +1,410 @@
+@@ -0,0 +1,412 @@
 +/*
 + * VVC (Versatile Video Coding) decoder using the Fraunhofer vvdec library
 + *
@@ -459,6 +459,7 @@ index 0000000000..e82e073141
 +
 +        if (vframe) {
 +            ret = libvvdec_copy_frame(avctx, frame, vframe);
++            vvdec_frame_unref(ctx->decoder, vframe);
 +            av_free(ctx->pending_buf);
 +            ctx->pending_buf = NULL;
 +            ctx->pending_off = ctx->pending_size;
@@ -485,6 +486,7 @@ index 0000000000..e82e073141
 +        ret = vvdec_decode(ctx->decoder, &fau, &vframe);
 +        if (vframe) {
 +            ret = libvvdec_copy_frame(avctx, frame, vframe);
++            vvdec_frame_unref(ctx->decoder, vframe);
 +            if (ret < 0)
 +                return ret;
 +            *got_frame = 1;
