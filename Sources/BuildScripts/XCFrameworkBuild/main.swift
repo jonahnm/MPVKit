@@ -24,6 +24,7 @@ do {
     try BuildPlacebo().buildALL()
     try BuildDav1d().buildALL()
     try BuildVvdec().buildALL()
+    try BuildLcevcDec().buildALL()
     try BuildFFMPEG().buildALL()
 
     // mpv
