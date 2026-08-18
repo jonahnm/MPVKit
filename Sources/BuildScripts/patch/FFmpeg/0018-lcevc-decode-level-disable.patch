@@ -1,0 +1,29 @@
+--- ffmpeg-master/libavcodec/decode.c	2026-08-06 19:28:28.111278016 -0400
++++ ffmpeg-verify/libavcodec/decode.c	2026-08-06 19:32:59.377088736 -0400
+@@ -1638,7 +1638,7 @@
+         break;
+     }
+ 
+-#if CONFIG_LIBLCEVC_DEC
++#if 0 && CONFIG_LIBLCEVC_DEC
+     AVCodecInternal    *avci = avctx->internal;
+     DecodeContext        *dc = decode_ctx(avci);
+ 
+@@ -1714,7 +1714,7 @@
+ 
+     frame->private_ref = fdd;
+ 
+-#if CONFIG_LIBLCEVC_DEC
++#if 0 && CONFIG_LIBLCEVC_DEC
+     AVCodecInternal    *avci = avctx->internal;
+     DecodeContext        *dc = decode_ctx(avci);
+ 
+@@ -2147,7 +2147,7 @@
+ 
+     if (!(avctx->export_side_data & AV_CODEC_EXPORT_DATA_ENHANCEMENTS)) {
+         if (avctx->codec_type == AVMEDIA_TYPE_VIDEO) {
+-#if CONFIG_LIBLCEVC_DEC
++#if 0 && CONFIG_LIBLCEVC_DEC
+             ret = ff_lcevc_alloc(&dc->lcevc.ctx, av_log_get_level() + avctx->log_level_offset);
+             if (ret < 0 && (avctx->err_recognition & AV_EF_EXPLODE))
+                 return ret;
