@@ -14,7 +14,7 @@ index e02af09..422c2a0 100644
  
      struct IAMFDemuxContext *iamf;
      int iamf_stream_offset;
-++
++
 +    /* Separate-track LCEVC (MPEG-5 part 2) enhancement merging. When this
 +     * stream is a base layer with a dedicated lvc1 enhancement track,
 +     * lcevc_el_index holds the enhancement stream's ffindex (-1 if none);
