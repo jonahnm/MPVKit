@@ -45,10 +45,10 @@ enum Library: String, CaseIterable {
         case .libmpv:
             return "v0.41.0"
         case .FFmpeg:
-            // The fork patch series is rebased onto a known master snapshot
-            // (9862dd8); if a master move breaks the patch series the build
-            // fails loudly and the patches must be rebased again.
-            return "master"
+            // The fork patch series is rebased onto a pinned master snapshot;
+            // if a master move breaks the patch series the build fails loudly
+            // and the patches must be rebased onto a new snapshot again.
+            return "f101fce22d64db10f500242e23e43a251fe14414"
         case .openssl:
             return "3.3.5"
         case .libvvdec:
