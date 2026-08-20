@@ -1,0 +1,21 @@
+diff --git a/libavcodec/libvvdecdec.c b/libavcodec/libvvdecdec.c
+index 2054e32..3d99ea7 100644
+--- a/libavcodec/libvvdecdec.c
++++ b/libavcodec/libvvdecdec.c
+@@ -160,6 +160,16 @@ static int libvvdec_copy_frame(AVCodecContext *avctx, AVFrame *frame,
+ 
+     frame->width  = src->width;
+     frame->height = src->height;
++    if (src->picAttributes && src->picAttributes->vui) {
++        const vvdecVui *vui = src->picAttributes->vui;
++        if (vui->colourDescriptionPresentFlag) {
++            frame->color_primaries = (enum AVColorPrimaries) vui->colourPrimaries;
++            frame->color_trc       = (enum AVColorTransferCharacteristic) vui->transferCharacteristics;
++            frame->colorspace      = (enum AVColorSpace) vui->matrixCoefficients;
++        }
++        if (vui->videoSignalTypePresentFlag)
++            frame->color_range = vui->videoFullRangeFlag ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
++    }
+     /* vvdec's cts is undefined when the AU had ctsValid=false; leave the
+      * frame timestamp unset so the caller derives timing from the packet. */
+     frame->pts = AV_NOPTS_VALUE;
